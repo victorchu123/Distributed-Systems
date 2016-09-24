@@ -35,14 +35,23 @@ def accept_and_handle_messages(bound_socket):
 
 # Purpose & Behavior: Receives message from client and decodes it into a usuable dict.
 # Input: Socket from accepted connection.
-# Output: Received message in the form of a decoded dictionary.
+# Output: Received message in the form of a decoded dictionary or throws an error message.
 def recv_from_client(sock):
 	recvd_msg_length_encoded = sock.recv (4, socket.MSG_WAITALL) # reads the length of the encoded, received message
 	recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the encoded length
-	recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL).decode() # reads and decodes the received message
-	recvd_msg = json.loads(recvd_msg) # decodes JSON formatted stream into a dict
+	recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL) # reads the received message
 
-	return recvd_msg
+	if (len(recvd_msg) == 0):
+		# recv gives 0 result if the connection has been closed
+		print("Connected terminated")
+		
+	elif (len(recvd_msg) != recvd_msg_length):
+		print("Incomplete message") 
+	else:
+		recvd_msg = recvd_msg.decode() # decodes the message from client
+		recvd_msg = json.loads(recvd_msg) # decodes JSON formatted stream into a dict
+		return recvd_msg
+
 
 # Purpose & Behavior: Processes commands from the received message and calls upon the 
 # appropriate functions in order to generate a response to the client.

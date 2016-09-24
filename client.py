@@ -39,10 +39,11 @@ def start_connection(args):
 			dest_host = args.server
 
 	dest_port = 2806 # destination port; where TCP connection with server is established
+	sock = socket.create_connection((dest_host, dest_port)) # opens connection with server at dest_host:dest_port or throws an exception
+	if sock is None:
+ 		print("Can’t connect.")
 
-	sock = socket.create_connection((dest_host, dest_port)) # opens connection with server at dest_host:dest_port
 	print('Trying to connect to ' + dest_host + ':' + str(dest_port))
-
 	return sock
 
 # Purpose & Behavior: Creates a dictionary from the provided namespace; 
@@ -88,10 +89,22 @@ def send_to_server(sock, args_dict):
 # Input: Socket where TCP connection is created.
 # Output: None
 def recv_from_server(sock):
-	recvd_msg_length_encoded = sock.recv (4, socket.MSG_WAITALL) # reads the message's (from client) length
+
+	# Receive at most msg_length bytes
+	# Returns value received
+	length_of_length = 4 # length of the (length of the received message)
+	recvd_msg_length_encoded = sock.recv (length_of_length, socket.MSG_WAITALL) # reads the message's (from client) length
 	recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the 32-bit binary value as an int; big-endian
-	recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL).decode() # reads and decodes the message from client
-	print(recvd_msg) # prints out response from server; in the format of {'status': some_str, 'result': some_str, 'id': some_str} 
+	recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL)# reads the message from client
+
+	if (len(recvd_msg) == 0):
+		# recv gives 0 result if the connection has been closed
+		print("Connected terminated") 
+	elif (len(recvd_msg) != recvd_msg_length):
+		print("Incomplete message") 
+	else:
+		recvd_msg = recvd_msg.decode() # decodes the message from server
+		print(recvd_msg) # prints out response from server; in the format of {'status': some_str, 'result': some_str, 'id': some_str} 
 
 # Purpose & Behavior: Main function.
 # Input: None
