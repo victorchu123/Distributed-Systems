@@ -39,7 +39,7 @@ class Server:
 		while True:
 			sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
 			if (accepted_port is not None): # checks if there is an accepted_port
-				print ("Connected to " + addr + ":" + str(accepted_port))
+				print ("Accepting connection from host " + addr)
 				recvd_msg = self.recv_from_client(sock)
 				response_dict = self.process_msg_from_client(recvd_msg)
 				self.send_to_client(sock, response_dict)
@@ -124,7 +124,7 @@ class Server:
 			sock.sendall(send_msg_length_encoded)
 			sock.sendall(send_msg)
 		except: 
-			print ("Can't send over whole message!")
+			print ("Can't send over whole message.")
 			sock.close()
 			sys.exit()
 

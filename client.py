@@ -48,7 +48,7 @@ class Client:
 		timeout = 5
 
 		while (dest_port <= 38010):
-			print('Trying to connect to ' + dest_host + ':' + str(dest_port))
+			print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
 			try:
 				sock = socket.create_connection((dest_host, dest_port), timeout) # opens connection with server at dest_host:dest_port
 				break

@@ -24,7 +24,7 @@ class FunctionsUnitTests(unittest.TestCase):
 	def test_get(self):
 		functions.rpc_dict = {}
 		key = 'monkey'
-		self.assertRaises(LookupError, functions.get, key)
+		self.assertEqual(functions.get(key), None)
 
 		functions.rpc_dict['monkey'] = 'bananas'
 		self.assertTrue(type(functions.get(key)) is str)
