@@ -1,5 +1,3 @@
-Name: Victor Chu
-
 Instructions:
 	-Navigate to directory with all .py files with 'cd' command in Terminal.
 	-Run the commands 'python3 functions_unit_tests.py' and 'python3 client_unit_tests.py' to run UNIT TESTS.
