@@ -47,6 +47,7 @@ class Client:
 		sock = None
 		timeout = 5
 
+		# tries to connect to dest_port; will continue until it either finds an open port or gives up
 		while (dest_port <= 38010):
 			print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
 			try:

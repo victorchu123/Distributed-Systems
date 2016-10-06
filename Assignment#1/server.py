@@ -13,6 +13,7 @@ class Server:
 		# Listen on port on all interfaces
 		src_port = 38000
 
+		# tries to listen on ports 38000-38010; it will stop if it either finds an open port or gives up
 		while (src_port <= 38010):
 			print ("Trying to listen on "+ str(src_port) + '...')
 			# Note these calls may throw an exception if it fails
