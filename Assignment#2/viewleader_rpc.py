@@ -1,12 +1,11 @@
-import time, socket, common_functions
+import time, socket, common_functions, view_leader
 from collections import deque
 
 heartbeats = {}
 view = []
-epoch = 0
 locks_held = {}
 
-def query_servers():
+def query_servers(epoch):
     info = []
     for addr, port in view:
         info.append(addr + ':' + str(port))

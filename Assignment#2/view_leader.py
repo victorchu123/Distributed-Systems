@@ -2,6 +2,7 @@
 
 import time, server, common_functions, sys, socket, viewleader_rpc
 
+epoch = 0
 
 class ViewLeader():
 
@@ -34,7 +35,8 @@ class ViewLeader():
         function_from_cmd = recvd_msg["cmd"] # takes function arguments from received dict
 
         if (function_from_cmd == 'query_servers'):
-            common_functions.send_msg(sock, viewleader_rpc.query_servers())
+            global epoch
+            common_functions.send_msg(sock, viewleader_rpc.query_servers(epoch))
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             port = recvd_msg["args"][1] # src port
@@ -67,7 +69,7 @@ class ViewLeader():
 
         heartbeats = viewleader_rpc.heartbeats
         view = viewleader_rpc.view
-        epoch = viewleader_rpc.epoch
+        global epoch
 
         for key, value in heartbeats.items():
             if (time.time() - value[0] > 30) and (value[1] == 'working'):
@@ -81,10 +83,10 @@ class ViewLeader():
         for key, value in heartbeats.items():
             if (value[1] == 'working') and (key not in view):
                 view.append(key)
-                epoch += 1
+                epoch = epoch + 1
             elif (value[1] == 'failed') and (key in view):
                 view.remove(key)
-                epoch += 1
+                epoch = epoch + 1
 
         if (epoch != 0) and (len(view) != 0):
             print (view, epoch)
