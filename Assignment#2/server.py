@@ -1,13 +1,25 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
-import socket, server_rpc, sys, common_functions, uuid
+import socket, server_rpc, sys, common_functions, uuid, argparse
 
 class Server:
 
     def __init__(self):
         self.src_port = 38000
-        self.view_leader_ip = 'localhost'
+        args = self.parse_cmd_arguments()
+        self.view_leader_ip = args.viewleader
+        print (self.view_leader_ip)
         self.unique_id = uuid.uuid4()
         self.start()
+        
+    # Purpose & Behavior: Uses argparse to process command line arguments into functions 
+    # and their respective inputs. 
+    # Input: Newly created object.
+    # Output: namespace of command line arguments
+    def parse_cmd_arguments(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--viewleader', default='localhost')
+        args = parser.parse_args()
+        return args
 
     # Purpose & Behavior: Starts accepting client connections and deals with receiving/responding to messages.
     # Input: Newly created object, and socket that is bound to port 2806.
