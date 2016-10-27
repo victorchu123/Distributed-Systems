@@ -10,7 +10,7 @@ class ViewLeader():
         self.start()
 
     def start(self):
-        sock = common_functions.start_listening(self.src_port, 39010, 5)
+        sock, src_port = common_functions.start_listening(self.src_port, 39010, None)
         self.accept_msg(sock)
         sock.close()
 
@@ -20,15 +20,11 @@ class ViewLeader():
     def accept_msg(self, bound_socket):
         # Accept connections forever
         while True:
-            try:
-                sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
-                if (accepted_port is not None): # checks if there is an accepted_port
-                    recvd_msg = common_functions.recv_msg(sock)
-                    self.process_msg_from_client(recvd_msg, addr, sock)
-                self.update_view()
-            except socket.timeout as e:
-                self.update_view()
-                continue
+            sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
+            if (accepted_port is not None): # checks if there is an accepted_port
+                recvd_msg = common_functions.recv_msg(sock)
+                self.process_msg_from_client(recvd_msg, addr, sock)
+            self.update_view()
 
     # Purpose & Behavior: Processes commands from the received message and calls upon the 
     # appropriate functions in order to generate a response to the client.
@@ -38,12 +34,12 @@ class ViewLeader():
         function_from_cmd = recvd_msg["cmd"] # takes function arguments from received dict
 
         if (function_from_cmd == 'query_servers'):
-            common_functions.send_msg(viewleader_rpc.query_servers())
+            common_functions.send_msg(sock, viewleader_rpc.query_servers())
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             port = recvd_msg["args"][1] # src port
             viewleader_ip = recvd_msg["args"][2]
-            heartbeat(new_id, port, viewleader_ip, addr, sock)
+            viewleader_rpc.heartbeat(new_id, port, viewleader_ip, addr, sock)
 
         elif (function_from_cmd == 'lock_get'):
             lock_name = recvd_msg["lock_name"]
@@ -82,8 +78,6 @@ class ViewLeader():
             last_timestamp, status, current_id = heartbeats[server]
             heartbeats[server] = (last_timestamp, 'failed', current_id)    
 
-        # print (self.heartbeats)
-
         for key, value in heartbeats.items():
             if (value[1] == 'working') and (key not in view):
                 view.append(key)
@@ -93,7 +87,7 @@ class ViewLeader():
                 epoch += 1
 
         if (epoch != 0) and (len(view) != 0):
-            print (viewleader_rpc.view, epoch)
+            print (view, epoch)
 
 
 if __name__ == '__main__':

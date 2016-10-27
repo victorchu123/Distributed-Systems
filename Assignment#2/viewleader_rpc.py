@@ -10,7 +10,7 @@ def query_servers():
     info = []
     for addr, port in view:
         info.append(addr + ':' + str(port))
-    return ("{'Active servers': " + str(info), "'Current epoch': " + str(epoch) + "}")
+    return ({'Active servers': str(info), 'Current epoch': str(epoch)})
 
 # True: Lock is granted
 # False: Lock is denied

@@ -78,12 +78,12 @@ class Client:
             dest_host = str(args.viewleader)
             dest_port_low = 39000
             dest_port_high = 39010
-            timeout = 5
+            timeout = 1
         else:
             dest_host = str(args.server)
             dest_port_low = 38000
             dest_port_high = 38010
-            timeout = 5
+            timeout = 1
 
         args_dict = self.create_dict(args)
 
@@ -104,9 +104,7 @@ class Client:
                     recvd_msg = common_functions.recv_msg(sock)
                     if (recvd_msg == "{'status': 'retry'}"):
                         print (str(recvd_msg))
-                        print ("Waiting for 5 seconds...") 
                         time.sleep(5)
-                        print ("Done waiting for 5 seconds.")
                     else: 
                         print (str(recvd_msg))
                         stop = True  

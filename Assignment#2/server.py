@@ -40,11 +40,13 @@ class Server:
             except socket.timeout:
                 try:
                     print ('Sending heartbeat msg...')
-                    common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), self.src_port, self.view_leader_ip]})
+                    sock = common_functions.create_connection('localhost', 39000, 39010, 1)
+                    common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port, self.view_leader_ip]})
                     recvd_msg = common_functions.recv_msg(sock)
                     print ('Receiving response...')
                     if (recvd_msg is not None):
                         print (str(recvd_msg))
+                    sock.close()
                 except Exception as e:
                     print ('Heartbeat rejected, will try again in 10 seconds: ', e)
                 continue
@@ -87,8 +89,8 @@ class Server:
         return response_dict
 
     def start(self):
-        bound_socket = common_functions.start_listening(self.src_port, 38010, 10)
-        self.accept_and_handle_messages(bound_socket, self.src_port, self.view_leader_ip)
+        bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
+        self.accept_and_handle_messages(bound_socket, src_port, self.view_leader_ip)
         sock.close() # closes connection with server
 
 if __name__ == '__main__':

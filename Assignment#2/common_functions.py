@@ -76,5 +76,5 @@ def start_listening(src_port_low, src_port_max, timeout):
                 print ("Cannot find an open port from {}-{}: ".format(src_port_low, src_port_max), e)
                 sys.exit()
             continue
-    return bound_socket
+    return (bound_socket, src_port)
 
