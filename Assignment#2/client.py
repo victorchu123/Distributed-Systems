@@ -1,5 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
-import socket, argparse, sys, common_functions
+import socket, argparse, sys, common_functions, time
 
 class Client:
 
@@ -85,25 +85,31 @@ class Client:
             dest_port_high = 38010
             timeout = 5
 
-        sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout)
-
         args_dict = self.create_dict(args)
 
         # print (args_dict)
 
         # sends encoded message length and message to server; if can't throw's an error
         stop = False
+        sock = None
 
         while (stop == False):
+            sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout)
             try:
+                print ("Sending RPC msg to viewleader...")
                 common_functions.send_msg(sock, args_dict)
 
-                 # receives decoded message length and message from server; if can't throw's an error
+                # receives decoded message length and message from server; if can't throw's an error
                 try:
                     recvd_msg = common_functions.recv_msg(sock)
-                    if (recvd_msg == "{'status': 'granted'}"):
-                        print (str(recvd_msg))  
-                        stop = True
+                    if (recvd_msg == "{'status': 'retry'}"):
+                        print (str(recvd_msg))
+                        print ("Waiting for 5 seconds...") 
+                        time.sleep(5)
+                        print ("Done waiting for 5 seconds.")
+                    else: 
+                        print (str(recvd_msg))
+                        stop = True  
                 except ConnectionResetError:
                     print("Connection dropped.")
                     sys.exit()
@@ -113,8 +119,8 @@ class Client:
                         sock.close()
                     sys.exit()
 
-            except: 
-                print ("Failed send over whole message.")
+            except Exception as e: 
+                print ("Failed send over whole message.", e)
                 if (sock is not None):
                     sock.close()
                     sys.exit()

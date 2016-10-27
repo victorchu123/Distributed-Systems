@@ -39,6 +39,7 @@ def lock_get(lock, requester):
                 return False
             else:
                 print ("Request is already in {}'s".format(lock) + " waiter queue")
+                return False
 
 def lock_release(lock, requester):
     waiter_queue, current_holder = locks_held[lock]

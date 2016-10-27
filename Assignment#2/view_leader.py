@@ -12,6 +12,7 @@ class ViewLeader():
     def start(self):
         sock = common_functions.start_listening(self.src_port, 39010, 5)
         self.accept_msg(sock)
+        sock.close()
 
     # Purpose & Behavior:
     # Input: 
@@ -24,7 +25,6 @@ class ViewLeader():
                 if (accepted_port is not None): # checks if there is an accepted_port
                     recvd_msg = common_functions.recv_msg(sock)
                     self.process_msg_from_client(recvd_msg, addr, sock)
-                
                 self.update_view()
             except socket.timeout as e:
                 self.update_view()
@@ -53,6 +53,7 @@ class ViewLeader():
                 common_functions.send_msg(sock, "{'status': 'granted'}")
             else:
                 common_functions.send_msg(sock, "{'status': 'retry'}")
+                print ("Sending retry message to client.")
 
         elif (function_from_cmd == 'lock_release'):
             lock_name = recvd_msg["lock_name"]

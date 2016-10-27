@@ -40,7 +40,7 @@ def recv_msg(sock):
 def create_connection(dest_host, dest_port_low, dest_port_max, timeout):
     dest_port = dest_port_low
     while (dest_port <= dest_port_max):
-        print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
+        # print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
         # Note these calls may throw an exception if it fails
         try:
             sock = socket.create_connection((dest_host, dest_port), timeout) # opens connection with view leader
