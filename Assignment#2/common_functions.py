@@ -35,7 +35,8 @@ def recv_msg(sock):
         return recvd_msg 
 
 # Purpose & Behavior: Starts TCP connection from this client to given server
-# Input: destination host, destination port lower bound & upper bound, timeout for socket
+# Input: destination host, destination port lower bound & upper bound, timeout for socket, and boolean
+# indicating whether to exit the system or not.
 # Output: Socket where TCP connection is created.
 def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
     dest_port = dest_port_low
