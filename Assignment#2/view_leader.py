@@ -40,8 +40,7 @@ class ViewLeader():
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             port = recvd_msg["args"][1] # src port
-            viewleader_ip = recvd_msg["args"][2]
-            viewleader_rpc.heartbeat(new_id, port, viewleader_ip, addr, sock)
+            viewleader_rpc.heartbeat(new_id, port, addr, sock)
 
         elif (function_from_cmd == 'lock_get'):
             lock_name = recvd_msg["lock_name"]

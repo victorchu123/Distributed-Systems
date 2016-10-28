@@ -7,7 +7,6 @@ class Server:
         self.src_port = 38000
         args = self.parse_cmd_arguments()
         self.view_leader_ip = args.viewleader
-        print (self.view_leader_ip)
         self.unique_id = uuid.uuid4()
         self.start()
         
