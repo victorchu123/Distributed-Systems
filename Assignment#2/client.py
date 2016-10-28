@@ -92,7 +92,7 @@ class Client:
         sock = None
 
         while (stop == False):
-            sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout)
+            sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
             try:
                 print ("Sending RPC msg to viewleader...")
                 # sends encoded message length and message to server/viewleader; if can't throw's an error

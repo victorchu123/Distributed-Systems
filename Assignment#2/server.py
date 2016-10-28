@@ -48,7 +48,7 @@ class Server:
             except socket.timeout:
                 try:
                     print ('Sending heartbeat msg to viewleader...')
-                    sock = common_functions.create_connection('localhost', 39000, 39010, 1)
+                    sock = common_functions.create_connection('localhost', 39000, 39010, 1, False)
                     
                     try:
                         common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port, self.view_leader_ip]})
@@ -68,7 +68,7 @@ class Server:
                         print (str(recvd_msg))
                     sock.close()
                 except Exception as e:
-                    print ('Heartbeat rejected, will try again in 10 seconds: ', e)
+                    print ('Heartbeat rejected, will try again in 10 seconds...')
                 continue
 
     # Purpose & Behavior: Processes commands from the received message and calls upon the 

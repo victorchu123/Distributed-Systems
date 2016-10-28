@@ -37,7 +37,7 @@ def recv_msg(sock):
 # Purpose & Behavior: Starts TCP connection from this client to given server
 # Input: destination host, destination port lower bound & upper bound, timeout for socket
 # Output: Socket where TCP connection is created.
-def create_connection(dest_host, dest_port_low, dest_port_max, timeout):
+def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
     dest_port = dest_port_low
     while (dest_port <= dest_port_max):
         # print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
@@ -50,7 +50,10 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout):
                 dest_port += 1
             else:
                 print ("Cannot find an open port from {}-{}: ".format(dest_port_low, dest_port_max), e)
-                sys.exit()
+                if (exit):
+                    sys.exit()
+                else: 
+                    raise Exception
             continue
     return sock
 
