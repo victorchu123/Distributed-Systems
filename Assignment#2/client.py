@@ -8,7 +8,7 @@ class Client:
 
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
     # and their respective inputs. 
-    # Input: Newly created object.
+    # Input: None
     # Output: namespace of command line arguments
     def parse_cmd_arguments(self):
         parser = argparse.ArgumentParser()
@@ -74,6 +74,7 @@ class Client:
                 print ("RPC command not provided.")
                 sys.exit()
 
+        # sets destination port ranges and destination hosts based on the RPC functions called
         if (args.cmd == 'query_servers') or (args.cmd == 'lock_get') or (args.cmd == 'lock_release'):
             dest_host = str(args.viewleader)
             dest_port_low = 39000
@@ -87,9 +88,6 @@ class Client:
 
         args_dict = self.create_dict(args)
 
-        # print (args_dict)
-
-        # sends encoded message length and message to server; if can't throw's an error
         stop = False
         sock = None
 
@@ -97,14 +95,15 @@ class Client:
             sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout)
             try:
                 print ("Sending RPC msg to viewleader...")
+                # sends encoded message length and message to server/viewleader; if can't throw's an error
                 common_functions.send_msg(sock, args_dict)
 
-                # receives decoded message length and message from server; if can't throw's an error
+                # receives decoded message length and message from server/viewleader; if can't throw's an error
                 try:
                     recvd_msg = common_functions.recv_msg(sock)
                     if (recvd_msg == "{'status': 'retry'}"):
                         print (str(recvd_msg))
-                        time.sleep(5)
+                        time.sleep(5) # delays for 5 seconds and then tries again
                     else: 
                         print (str(recvd_msg))
                         stop = True  

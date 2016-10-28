@@ -16,7 +16,7 @@ def send_msg(sock, object):
 
 # Purpose & Behavior: Receives a message from the sender socket and decodes it. 
 # Input: Newly created object, and socket where TCP connection is created.
-# Output: None
+# Output: received message that is a decoded object
 def recv_msg(sock):
     # Receive at most msg_length bytes
     # Returns value received
@@ -35,7 +35,7 @@ def recv_msg(sock):
         return recvd_msg 
 
 # Purpose & Behavior: Starts TCP connection from this client to given server
-# Input: Newly created object, and command line argument namespace (args)
+# Input: destination host, destination port lower bound & upper bound, timeout for socket
 # Output: Socket where TCP connection is created.
 def create_connection(dest_host, dest_port_low, dest_port_max, timeout):
     dest_port = dest_port_low
@@ -54,9 +54,9 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout):
             continue
     return sock
 
-# Purpose & Behavior: Starts listening on the designated src port for a client. 
-# Input: Newly created object.
-# Output: Socket that is bound to src port.
+# Purpose & Behavior: Starts listening on the designated src port for a source host
+# Input: source port lower bound & upper bound, timeout for socket
+# Output: Tuple of socket that is bound to source port and source port
 def start_listening(src_port_low, src_port_max, timeout):
     src_port = src_port_low
     # tries to listen on port range; it will stop if it either finds an open port or gives up

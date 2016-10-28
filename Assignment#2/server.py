@@ -12,7 +12,7 @@ class Server:
         
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
     # and their respective inputs. 
-    # Input: Newly created object.
+    # Input: None
     # Output: namespace of command line arguments
     def parse_cmd_arguments(self):
         parser = argparse.ArgumentParser()
@@ -21,7 +21,7 @@ class Server:
         return args
 
     # Purpose & Behavior: Starts accepting client connections and deals with receiving/responding to messages.
-    # Input: Newly created object, and socket that is bound to port 2806.
+    # Input: Newly created object, and socket that is bound to port within the given range.
     # Output: None
     def accept_and_handle_messages(self, bound_socket, src_port, view_leader_ip):
         # Accept connections forever
@@ -30,7 +30,6 @@ class Server:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
                     print ("Accepting connection from host " + addr)
-
                     # receives decoded message length and message from client; if can't throw's an error
                     try: 
                         recvd_msg = common_functions.recv_msg(sock)
@@ -40,20 +39,30 @@ class Server:
                         print ("Cannot decode message.")
 
                     response_dict = self.process_msg_from_client(recvd_msg)
-
                     # sends encoded message length and message to client; if can't throw's an error
                     try: 
                         common_functions.send_msg(sock, response_dict)
                     except: 
                         print ("Can't send over whole message.")
                         sock.close()
-
             except socket.timeout:
                 try:
-                    print ('Sending heartbeat msg...')
+                    print ('Sending heartbeat msg to viewleader...')
                     sock = common_functions.create_connection('localhost', 39000, 39010, 1)
-                    common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port, self.view_leader_ip]})
-                    recvd_msg = common_functions.recv_msg(sock)
+                    
+                    try:
+                        common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port, self.view_leader_ip]})
+                    except: 
+                        print ("Can't send over whole message.")
+                        sock.close()
+
+                    try: 
+                        recvd_msg = common_functions.recv_msg(sock)
+                    except ConnectionResetError:
+                        print("Connection dropped.")
+                    except AttributeError:
+                        print ("Cannot decode message.")
+
                     print ('Receiving response...')
                     if (recvd_msg is not None):
                         print (str(recvd_msg))
