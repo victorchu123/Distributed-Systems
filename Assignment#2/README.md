@@ -20,4 +20,3 @@
 	-Run the command 'python3 client.py' to start up the client. 
 	-Run the command 'python3 client.py -h' for usage details (in order to specify the viewleader IP Address and call RPC functions).
 
-**test**
