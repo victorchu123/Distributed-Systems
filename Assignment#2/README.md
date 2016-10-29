@@ -1,4 +1,4 @@
-#Remote Procedure Call with a Centralized Lock Server and Heartbeat Failure Detection
+#Remote Procedure Call with a Centralized Lock Server and Failure Detection (Heartbeat with Group View) 
 ##Instructions:
 	1) Navigate to directory with all .py files with 'cd' command in Terminal.
 	
