@@ -1,6 +1,6 @@
 #Distributed File System
 *Features: Remote Procedure Call, Centralized Lock Server, and Heartbeat Failure Detection*
-####Instructions:
+###Instructions:
 	1) Navigate to directory with all .py files with 'cd' command in Terminal.
 	
 	2) Start up Viewleader, Server, and then Client. 
