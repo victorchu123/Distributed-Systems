@@ -1,4 +1,4 @@
-#Distributed System with Remote Procedure Call, Centralized Lock Server, and Heartbeat Failure Detection
+#Distributed File System with Remote Procedure Call, Centralized Lock Server, and Heartbeat Failure Detection
 ##Instructions:
 	1) Navigate to directory with all .py files with 'cd' command in Terminal.
 	
