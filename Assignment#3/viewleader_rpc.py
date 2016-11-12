@@ -1,9 +1,13 @@
-import time, socket, common_functions, view_leader
+import time, socket, common_functions, view_leader, hashlib
 from collections import deque
 
 heartbeats = {}
 view = []
 locks_held = {}
+active_servers = []
+server_ordered_dict = OrderedDict()
+replica_count = 0
+HASH_MAX = 0
 
 # Purpose & Behavior: Returns current view and epoch
 # Input: epoch from viewleader
@@ -98,3 +102,99 @@ def heartbeat(new_id, port, addr, sock):
         print ("Accepting heartbeat from host: " + addr + ":" + str(port))
         common_functions.send_msg(sock, "Heartbeat was accepted.")
         heartbeats[(addr, port)] = heartbeats_value
+
+def setr(key, value):
+    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
+    replica_buckets = bucket_allocator(key, value)
+    # store and write distributed commit 
+    # for (ip, port) in replica_buckets:
+
+def getr(key):
+    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
+    replica_buckets = bucket_allocator(key, value)
+
+    for (server_hash, (addr, port)) in replica_buckets:
+        server_sock = create_connection(addr, port, port, None, True) 
+        send_msg(server_sock, {'cmd': 'get_key', 'key': key}) 
+        response_key = recv_msg(server_sock) # desired value associated with the given key from DHT
+
+        if (response_key == False):
+            response =  "No key found in any of the replica servers."
+        else:
+            response = response_key
+    return response
+
+def hash_key(d):
+    sha1 = hashlib.sha1(d)
+    return int(sha1.hexdigest(), 16) % HASH_MAX
+
+def update_DHT():
+    addr_port_tuple_lst = []
+
+    if (len(view) >= 3):
+        replica_count = 3
+    else:
+        replica_count = len(view)
+
+    for addr, port in view:
+        addr_port_tuple_lst.append(addr, port)
+
+    # checks if dict is non-empty
+    if (server_ordered_dict):
+        # removes inactive servers from DHT and keeps track of servers in dict
+        server_hashes_to_remove = []
+        servers_in_dict = []
+
+        for server_hash, value in server_ordered_dict.items():
+            if (value not in addr_port_tuple_lst):
+                server_hashes_to_remove.append(server_hash)
+            servers_in_dict.append(value) 
+
+        for server_hash in server_hashes_to_remove:
+            server_ordered_dict.remove(server_hash)
+        
+    # adds active servers that are not already in DHT, to DHT with new hashes
+    for (addr, port) in addr_port_tuple_lst:
+        if ((addr, port) not in servers_in_dict): 
+            server_sock = create_connection(addr, port, port, None, True) 
+            send_msg(server_sock, {'cmd': 'get_id'}) 
+            server_id = recv_msg(server_sock) # unique server id
+            server_hash = hash_key(server_id)
+            server_ordered_dict[str(server_hash)] = (addr, port)
+
+    HASH_MAX = len(server_ordered_dict)
+
+def bucket_allocator(key, value):
+    update_DHT() #update DHT
+    key_hash = hash_key(key)
+
+    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
+    replica_buckets = []
+    bucket_count = 0
+
+    last_dict_elem = server_ordered_dict.items()[len(server_ordered_dict - 1)]
+
+    for server_hash, value in server_ordered_dict.items():
+        if (server_hash >= key_hash) and (bucket_count < replica_count):
+            replica_buckets.append(value)
+            bucket_count += 1
+            if ((server_hash, value) == last_dict_elem) and (bucket_count < replica_count):
+                if (replica_count == 2):
+                    first_dict_elem = server_ordered_dict.items()[0]
+                    replica_buckets.append(first_dict_elem[0])
+                    bucket_count += 1
+                elif (replica_count == 1):
+                    first_dict_elem = server_ordered_dict.items()[0]
+                    second_dict_elem = server_ordered_dict.items()[1]
+                    replica_buckets.append(first_dict_elem[0])
+                    bucket_count += 1
+                    replica_buckets.append(second_dict_elem[0])
+                    bucket_count += 1
+    return replica_buckets
+
+
+
+
+
+
+

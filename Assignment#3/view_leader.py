@@ -47,7 +47,6 @@ class ViewLeader():
 
         if (function_from_cmd == 'query_servers'):
             global epoch
-
             try:
                 common_functions.send_msg(sock, viewleader_rpc.query_servers(epoch))
             except: 
@@ -118,9 +117,19 @@ class ViewLeader():
             if (value[1] == 'working') and (key not in view):
                 view.append(key)
                 epoch = epoch + 1
+                # send rebalance RPC request to server
+                rebalance(view, epoch)
+                
             elif (value[1] == 'failed') and (key in view):
                 view.remove(key)
                 epoch = epoch + 1
+                # send rebalance RPC request to server
+                rebalance(view, epoch)
+
+    def rebalance(view, epoch):
+        for (addr, port) in view:
+            server_sock = create_connection(addr, port, port, None, True) 
+            send_msg(server_sock, {'cmd': 'rebalance', 'view': view, 'epoch': epoch}) 
 
 if __name__ == '__main__':
     view_leader = ViewLeader()

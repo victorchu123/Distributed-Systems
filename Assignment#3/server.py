@@ -8,6 +8,7 @@ class Server:
         args = self.parse_cmd_arguments()
         self.view_leader_ip = args.viewleader
         self.unique_id = uuid.uuid4()
+        self.bucket = {}
         self.start()
         
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
@@ -38,10 +39,10 @@ class Server:
                     except AttributeError:
                         print ("Cannot decode message.")
 
-                    response_dict = self.process_msg_from_client(recvd_msg)
+                    response = self.process_msg_from_client(recvd_msg)
                     # sends encoded message length and message to client; if can't throw's an error
                     try: 
-                        common_functions.send_msg(sock, response_dict)
+                        common_functions.send_msg(sock, response)
                     except: 
                         print ("Can't send over whole message.")
                         sock.close()
@@ -73,11 +74,16 @@ class Server:
 
     # Purpose & Behavior: Processes commands from the received message and calls upon the 
     # appropriate functions in order to generate a response to the client.
-    # Input: Newly created object, and received message in the form of a decoded dictionary.
-    # Output: Dictionary that is the response to the client and will be sent to the client.
+    # Input: Newly created object, and received message in the form of a decoded dictionary {'cmd': str, 'id': int}.
+    # Output: Response to the client and will be sent to the client.
     def process_msg_from_client(self, recvd_msg):
         function_from_cmd = recvd_msg["cmd"] # takes function arguments from received dict
-        unique_id = recvd_msg["id"] # takes unique_id from received dict
+
+        try:
+            unique_id = recvd_msg["id"] # takes unique_id from received dict
+        except LookupError:
+            unique_id = None
+
         # checks if function is print; if so, then take the text from the received dict
         if (function_from_cmd == "print"):
             text = recvd_msg["text"] # print's argument
@@ -87,26 +93,36 @@ class Server:
                 text = text[0]
 
             print ("Printing " + str(text))
-            response_dict = {'status': 'success','result': text, 'id': unique_id}
+            response = {'status': 'success','result': text, 'id': unique_id}
         elif (function_from_cmd == "set"):
             server_rpc.set(recvd_msg["key"], recvd_msg["val"])
-            response_dict = {'status': 'success', 'id': unique_id}
+            response = {'status': 'success', 'id': unique_id}
         elif (function_from_cmd == "get"):
             result = server_rpc.get(recvd_msg["key"])
             if (result is None):
-                response_dict = {'status': 'fail', 'result': result, 'id': unique_id}
+                response = {'status': 'fail', 'result': result, 'id': unique_id}
             else:
-                response_dict = {'status': 'success', 'result': result, 'id': unique_id}
+                response = {'status': 'success', 'result': result, 'id': unique_id}
         elif (function_from_cmd == "query_all_keys"):
             result = server_rpc.query_all_keys()
             if (result is None):
-                response_dict = {'status': 'fail', 'result': result, 'id': unique_id}
+                response = {'status': 'fail', 'result': result, 'id': unique_id}
             else:
-                response_dict = {'status': 'success', 'result': result, 'id': unique_id}
+                response = {'status': 'success', 'result': result, 'id': unique_id}
+        elif (function_from_cmd == "get_id"):
+            response = self.unique_id
+        elif (function_from_cmd == "get_key"):
+            key = recvd_msg["key"]
+            try:
+                response = self.bucket[key]
+            except LookupError:
+                response = False
+        elif (function_from_cmd == "rebalance"):
+            
         else:
             print ("Rejecting RPC request because function is unknown.")
 
-        return response_dict
+        return response
 
     def start(self):
         bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
