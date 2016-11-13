@@ -141,6 +141,7 @@ def update_DHT():
             server_sock = create_connection(addr, port, port, None, True) 
             send_msg(server_sock, {'cmd': 'get_id'}, False) 
             server_id = recv_msg(server_sock, False) # unique server id
+            server_sock.close()
             server_hash = hash_key(server_id)
             server_ordered_dict[str(server_hash)] = (addr, port)
 

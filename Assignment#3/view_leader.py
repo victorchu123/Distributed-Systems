@@ -62,12 +62,14 @@ class ViewLeader():
                 common_functions.send_msg(sock, "{'status': 'ok'}", False)
             else:
                 common_functions.send_msg(sock, "{'status': 'not ok'}", False)
-        elif (function_from_cmd == 'bucket_allocator'):
+        elif (function_from_cmd == 'get_buckets'):
             key = recvd_msg["key"]
             if (value is not None):
                 value = recvd_msg["val"]
             replica_buckets = viewleader_rpc.bucket_allocator(key, value)
             common_functions.send_msg(sock, replica_buckets, False)
+        elif (function_from_cmd == 'get_view'):
+            common_functions.send_msg(sock, viewleader_rpc.view{, False)
         else:
             print ("Rejecting RPC request because function is unknown.")
 
@@ -109,7 +111,8 @@ class ViewLeader():
     def rebalance(view):
         for (addr, port) in view:
             server_sock = create_connection(addr, port, port, None, True) 
-            send_msg(server_sock, {'cmd': 'rebalance', 'view': view}, False) 
+            send_msg(server_sock, {'cmd': 'rebalance', 'view': view}, False)
+            server_sock.close() 
 
 if __name__ == '__main__':
     view_leader = ViewLeader()
