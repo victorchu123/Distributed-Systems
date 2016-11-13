@@ -64,6 +64,12 @@ class Server:
                     print ('Heartbeat rejected, will try again in 10 seconds...')
                 continue
 
+    def vote(epoch, server_id):
+        if (epoch == self.epoch) and (server_id == self.unique_id):
+            return 'commit'
+        else:
+            return 'abort'
+
     # Purpose & Behavior: Processes commands from the received message and calls upon the 
     # appropriate functions in order to generate a response to the client.
     # Input: Newly created object, and received message in the form of a decoded dictionary {'cmd': str, 'id': int}.
@@ -109,8 +115,11 @@ class Server:
                 response = self.bucket[key]
             except LookupError:
                 response = False
+        elif (function_from_cmd == 'request_vote'):
+            viewleader_epoch = recvd_msg["epoch"]
+            server_id = recvd_msg["server_id"]
+            response = vote(viewleader_epoch, server_id)
         elif (function_from_cmd == "rebalance"):
-
         else:
             print ("Rejecting RPC request because function is unknown.")
 

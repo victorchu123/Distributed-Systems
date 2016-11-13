@@ -4,7 +4,6 @@ from collections import deque
 heartbeats = {}
 view = []
 locks_held = {}
-active_servers = []
 server_ordered_dict = OrderedDict()
 replica_count = 0
 HASH_MAX = 0
@@ -14,9 +13,9 @@ HASH_MAX = 0
 # Output: dictionary of list of active servers and the current epoch
 def query_servers(epoch):
     info = []
-    for addr, port in view:
-        info.append(addr + ':' + str(port))
-    return ({'Active servers': str(info), 'Current epoch': str(epoch)})
+    for ((addr, port), server_id) in view:
+        info.append((addr + ':' + str(port), server_id))
+    return ({'Active servers': info, 'Current epoch': epoch})
 
 # Purpose & Behavior: Attempts to obtain the lock for the requester
 # Input: lock name and requester id
@@ -118,7 +117,7 @@ def update_DHT():
     else:
         replica_count = len(view)
 
-    for addr, port in view:
+    for ((addr, port), server_id) in view:
         addr_port_tuple_lst.append(addr, port)
 
     # checks if dict is non-empty

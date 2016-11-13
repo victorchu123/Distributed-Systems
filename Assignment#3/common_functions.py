@@ -4,13 +4,13 @@ import socket, json, struct, sys
 # Input: Newly created object, and socket where TCP connection is created and the object that we
 # want to send over.
 # Output: None
-def send_msg(sock, object, exit):
+def send_msg(sock, object_to_send, exit):
     # sends encoded message length and message to destination; if can't throw's an error
     try:
         print ("Sending RPC msg to destination...")
         # serializing object into a JSON formatted stream and then encoded 
         # into a unicode string.
-        send_msg_encoded = json.dumps(object).encode()
+        send_msg_encoded = json.dumps(object_to_send).encode()
         send_msg_length = len(send_msg_encoded) # send message size 
         send_msg_length_encoded = struct.pack("!i", send_msg_length) # encodes an int as a 32-bit binary value; big-endian
 

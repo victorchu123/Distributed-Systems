@@ -68,8 +68,6 @@ class ViewLeader():
                 value = recvd_msg["val"]
             replica_buckets = viewleader_rpc.bucket_allocator(key, value)
             common_functions.send_msg(sock, replica_buckets, False)
-        elif (function_from_cmd == 'get_view'):
-            common_functions.send_msg(sock, viewleader_rpc.view{, False)
         else:
             print ("Rejecting RPC request because function is unknown.")
 
@@ -96,20 +94,21 @@ class ViewLeader():
 
         # adds working servers to view and removes failing servers (also updates epoch when either of these actions happen)
         for key, value in heartbeats.items():
-            if (value[1] == 'working') and (key not in view):
-                view.append(key)
+            last_timestamp, status, server_id = value
+            if (status == 'working') and ((key, server_id) not in view):
+                view.append((key, server_id))
                 epoch = epoch + 1
                 # send rebalance RPC request to server
                 # rebalance(view)
                 
-            elif (value[1] == 'failed') and (key in view):
-                view.remove(key)
+            elif (status == 'failed') and ((key, server_id) in view):
+                view.remove((key, server_id))
                 epoch = epoch + 1
                 # send rebalance RPC request to server
                 # rebalance(view)
 
     def rebalance(view):
-        for (addr, port) in view:
+        for ((addr, port), server_id) in view:
             server_sock = create_connection(addr, port, port, None, True) 
             send_msg(server_sock, {'cmd': 'rebalance', 'view': view}, False)
             server_sock.close() 
