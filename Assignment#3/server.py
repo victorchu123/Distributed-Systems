@@ -1,5 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
-import socket, server_rpc, sys, common_functions, uuid, argparse
+import socket, server_rpc, sys, common_functions, uuid, argparse, time
 
 class Server:
 
@@ -9,6 +9,8 @@ class Server:
         self.view_leader_ip = args.viewleader
         self.unique_id = uuid.uuid4()
         self.bucket = {}
+        self.last_heartbeat_time = 0
+        self.epoch = 1
         self.start()
         
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
@@ -21,53 +23,43 @@ class Server:
         args = parser.parse_args()
         return args
 
+    def send_and_recv_heartbeat(src_port):
+        print ('Sending heartbeat msg to viewleader...')
+        sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+        common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port]}, False)
+        recvd_msg = common_functions.recv_msg(sock, False)
+
+        print ('Receiving response...')
+        if (recvd_msg is not None):
+            status = recvd_msg[0]
+            curr_epoch = recvd_msg[1]
+            print (str(status))
+            self.epoch = curr_epoch
+        sock.close()
+
     # Purpose & Behavior: Starts accepting client connections and deals with receiving/responding to messages.
     # Input: Newly created object, and socket that is bound to port within the given range.
     # Output: None
     def accept_and_handle_messages(self, bound_socket, src_port, view_leader_ip):
         # Accept connections forever
         while True:
+            if (time.time() - last_heartbeat_time >= 10.0):
+                try:
+                    last_heartbeat_time = time.time()
+                    send_and_recv_heartbeat(src_port)
+                except Exception as e:
+                    print ('Heartbeat rejected, will try again in 10 seconds...')
             try:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
                     print ("Accepting connection from host " + addr)
-                    # receives decoded message length and message from client; if can't throw's an error
-                    try: 
-                        recvd_msg = common_functions.recv_msg(sock)
-                    except ConnectionResetError:
-                        print("Connection dropped.")
-                    except AttributeError:
-                        print ("Cannot decode message.")
-
+                    recvd_msg = common_functions.recv_msg(sock, False)
                     response = self.process_msg_from_client(recvd_msg)
-                    # sends encoded message length and message to client; if can't throw's an error
-                    try: 
-                        common_functions.send_msg(sock, response)
-                    except: 
-                        print ("Can't send over whole message.")
-                        sock.close()
+                    common_functions.send_msg(sock, response, False)
             except socket.timeout:
                 try:
-                    print ('Sending heartbeat msg to viewleader...')
-                    sock = common_functions.create_connection('localhost', 39000, 39010, 1, False)
-                    
-                    try:
-                        common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port, self.view_leader_ip]})
-                    except: 
-                        print ("Can't send over whole message.")
-                        sock.close()
-
-                    try: 
-                        recvd_msg = common_functions.recv_msg(sock)
-                    except ConnectionResetError:
-                        print("Connection dropped.")
-                    except AttributeError:
-                        print ("Cannot decode message.")
-
-                    print ('Receiving response...')
-                    if (recvd_msg is not None):
-                        print (str(recvd_msg))
-                    sock.close()
+                    last_heartbeat_time = time.time()
+                    send_and_recv_heartbeat(src_port)
                 except Exception as e:
                     print ('Heartbeat rejected, will try again in 10 seconds...')
                 continue
@@ -118,7 +110,7 @@ class Server:
             except LookupError:
                 response = False
         elif (function_from_cmd == "rebalance"):
-            
+
         else:
             print ("Rejecting RPC request because function is unknown.")
 
@@ -126,7 +118,7 @@ class Server:
 
     def start(self):
         bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
-        self.accept_and_handle_messages(bound_socket, src_port, self.view_leader_ip)
+        self.accept_and_handle_messages(bound_socket, src_port)
         sock.close() # closes connection with server
 
 if __name__ == '__main__':

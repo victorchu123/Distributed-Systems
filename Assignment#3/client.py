@@ -1,10 +1,15 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
-import socket, argparse, sys, common_functions, time
+import socket, argparse, sys, common_functions, time, client_rpc
 
 class Client:
 
     def __init__(self): 
         self.start()
+        self.dest_host = ''
+        self.dest_port_low = 0
+        self.dest_port_high = 0
+        self.timeout = 1
+        self.dest_name = ''
 
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
     # and their respective inputs. 
@@ -38,6 +43,13 @@ class Client:
         parser_lock_release = subparsers.add_parser('lock_release')
         parser_lock_release.add_argument('lock_name', type=str)
         parser_lock_release.add_argument('requester_id', type=str)
+
+        parser_setr = subparsers.add_parser('setr')
+        parser_setr.add_argument('key', type=str)
+        parser_setr.add_argument('val', type=str)
+
+        parser_getr = subparsers.add_parser('getr')
+        parser_getr.add_argument('key', type=str)
 
         args = parser.parse_args()
         return args
@@ -74,54 +86,52 @@ class Client:
                 print ("RPC command not provided.")
                 sys.exit()
 
+        viewleader_args = ['query_servers', 'lock_get', 'lock_release']
+
         # sets destination port ranges and destination hosts based on the RPC functions called
-        if (args.cmd == 'query_servers') or (args.cmd == 'lock_get') or (args.cmd == 'lock_release'):
-            dest_host = str(args.viewleader)
-            dest_port_low = 39000
-            dest_port_high = 39010
-            timeout = 1
+        if (args.cmd in viewleader_args):
+            self.dest_host = str(args.viewleader)
+            self.dest_port_low = 39000
+            self.dest_port_high = 39010
+            self.timeout = 1
+            self.dest_name = 'viewleader'
+        elif (args.cmd == 'getr' or args.cmd == 'setr'):
+            self.dest_host = str(args.viewleader)
+            self.dest_port_low = 39000
+            self.dest_port_high = 39010
+            self.timeout = 1
+            self.dest_name = 'viewleader_and_server'
         else:
-            dest_host = str(args.server)
-            dest_port_low = 38000
-            dest_port_high = 38010
-            timeout = 1
+            self.dest_host = str(args.server)
+            self.dest_port_low = 38000
+            self.dest_port_high = 38010
+            self.timeout = 1
+            self.dest_name = 'server'
 
         args_dict = self.create_dict(args)
 
         stop = False
         sock = None
 
+        if (self.dest_name == 'viewleader_and_server'):
+            stop = True
+            if (args.cmd == 'getr'):
+                print (client_rpc.getr(args.key))
+            else: 
+                print (client_rpc.setr(args.key, args.val))
+
         while (stop == False):
-            sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-            try:
-                print ("Sending RPC msg to viewleader...")
-                # sends encoded message length and message to server/viewleader; if can't throw's an error
-                common_functions.send_msg(sock, args_dict)
-
-                # receives decoded message length and message from server/viewleader; if can't throw's an error
-                try:
-                    recvd_msg = common_functions.recv_msg(sock)
-                    if (recvd_msg == "{'status': 'retry'}"):
-                        print (str(recvd_msg))
-                        time.sleep(5) # delays for 5 seconds and then tries again
-                    else: 
-                        print (str(recvd_msg))
-                        stop = True  
-                except ConnectionResetError:
-                    print("Connection dropped.")
-                    sys.exit()
-                except AttributeError:
-                    print ("Cannot decode message.")
-                    if (sock is not None):
-                        sock.close()
-                    sys.exit()
-
-            except Exception as e: 
-                print ("Failed send over whole message.", e)
-                if (sock is not None):
-                    sock.close()
-                    sys.exit()
-
+            sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
+            # sends encoded message length and message to server/viewleader; if can't throw's an error
+            common_functions.send_msg(sock, args_dict, True)
+            recvd_msg = common_functions.recv_msg(sock, True)
+            if (recvd_msg == "{'status': 'retry'}"):
+                print (str(recvd_msg))
+                time.sleep(5) # delays for 5 seconds and then tries again
+            else: 
+                print (str(recvd_msg))
+                stop = True  
+            
         if (sock is not None):
             sock.close()
         sys.exit()

@@ -24,13 +24,7 @@ class ViewLeader():
             try:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
-                    try:
-                        recvd_msg = common_functions.recv_msg(sock) # receives message from client/server
-                    except ConnectionResetError:
-                        print("Connection dropped.")
-                    except AttributeError:
-                        print ("Cannot decode message.")
-
+                    recvd_msg = common_functions.recv_msg(sock, False) # receives message from client/server
                     self.process_msg(recvd_msg, addr, sock)
                     self.update_view() # updates view
             except socket.timeout:
@@ -47,47 +41,33 @@ class ViewLeader():
 
         if (function_from_cmd == 'query_servers'):
             global epoch
-            try:
-                common_functions.send_msg(sock, viewleader_rpc.query_servers(epoch))
-            except: 
-                print ("Can't send over whole message.")
-                sock.close()
+            common_functions.send_msg(sock, viewleader_rpc.query_servers(epoch), False)
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             port = recvd_msg["args"][1] # src port
-            viewleader_rpc.heartbeat(new_id, port, addr, sock)
+            viewleader_rpc.heartbeat(new_id, port, addr, sock, epoch)
         elif (function_from_cmd == 'lock_get'):
             lock_name = recvd_msg["lock_name"]
             requester_id = recvd_msg["requester_id"]
 
             if (viewleader_rpc.lock_get(lock_name, requester_id) == True):
-                try:
-                    common_functions.send_msg(sock, "{'status': 'granted'}")
-                except: 
-                    print ("Can't send over whole message.")
-                    sock.close()
+                common_functions.send_msg(sock, "{'status': 'granted'}", False)
             else:
-                try:
-                    common_functions.send_msg(sock, "{'status': 'retry'}")
-                except: 
-                    print ("Can't send over whole message.")
-                    sock.close()
+                common_functions.send_msg(sock, "{'status': 'retry'}", False)
                 print ("Sending retry message to client.")
         elif (function_from_cmd == 'lock_release'):
             lock_name = recvd_msg["lock_name"]
             requester_id = recvd_msg["requester_id"]
             if (viewleader_rpc.lock_release(lock_name, requester_id) == True):
-                try:
-                    common_functions.send_msg(sock, "{'status': 'ok'}")
-                except: 
-                    print ("Can't send over whole message.")
-                    sock.close()
+                common_functions.send_msg(sock, "{'status': 'ok'}", False)
             else:
-                try:
-                    common_functions.send_msg(sock, "{'status': 'not ok'}")
-                except: 
-                    print ("Can't send over whole message.")
-                    sock.close()
+                common_functions.send_msg(sock, "{'status': 'not ok'}", False)
+        elif (function_from_cmd == 'bucket_allocator'):
+            key = recvd_msg["key"]
+            if (value is not None):
+                value = recvd_msg["val"]
+            replica_buckets = viewleader_rpc.bucket_allocator(key, value)
+            common_functions.send_msg(sock, replica_buckets, False)
         else:
             print ("Rejecting RPC request because function is unknown.")
 
@@ -118,18 +98,18 @@ class ViewLeader():
                 view.append(key)
                 epoch = epoch + 1
                 # send rebalance RPC request to server
-                rebalance(view, epoch)
+                # rebalance(view)
                 
             elif (value[1] == 'failed') and (key in view):
                 view.remove(key)
                 epoch = epoch + 1
                 # send rebalance RPC request to server
-                rebalance(view, epoch)
+                # rebalance(view)
 
-    def rebalance(view, epoch):
+    def rebalance(view):
         for (addr, port) in view:
             server_sock = create_connection(addr, port, port, None, True) 
-            send_msg(server_sock, {'cmd': 'rebalance', 'view': view, 'epoch': epoch}) 
+            send_msg(server_sock, {'cmd': 'rebalance', 'view': view}, False) 
 
 if __name__ == '__main__':
     view_leader = ViewLeader()

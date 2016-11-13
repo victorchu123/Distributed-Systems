@@ -4,37 +4,61 @@ import socket, json, struct, sys
 # Input: Newly created object, and socket where TCP connection is created and the object that we
 # want to send over.
 # Output: None
-def send_msg(sock, object):
-    # serializing object into a JSON formatted stream and then encoded 
-    # into a unicode string.
-    send_msg_encoded = json.dumps(object).encode()
-    send_msg_length = len(send_msg_encoded) # send message size 
-    send_msg_length_encoded = struct.pack("!i", send_msg_length) # encodes an int as a 32-bit binary value; big-endian
+def send_msg(sock, object, exit):
+    # sends encoded message length and message to destination; if can't throw's an error
+    try:
+        print ("Sending RPC msg to destination...")
+        # serializing object into a JSON formatted stream and then encoded 
+        # into a unicode string.
+        send_msg_encoded = json.dumps(object).encode()
+        send_msg_length = len(send_msg_encoded) # send message size 
+        send_msg_length_encoded = struct.pack("!i", send_msg_length) # encodes an int as a 32-bit binary value; big-endian
 
-    sock.sendall(send_msg_length_encoded) # sends encoded "message length"
-    sock.sendall(send_msg_encoded) # sends encoded message
+        sock.sendall(send_msg_length_encoded) # sends encoded "message length"
+        sock.sendall(send_msg_encoded) # sends encoded message
+    except Exception as e: 
+        print ("Failed send over whole message.", e)
+        if (sock is not None):
+            sock.close()
+        if (exit):
+            sys.exit()
 
 # Purpose & Behavior: Receives a message from the sender socket and decodes it. 
 # Input: Newly created object, and socket where TCP connection is created.
 # Output: received message that is a decoded object
-def recv_msg(sock):
-    # Receive at most msg_length bytes
-    # Returns value received
-    length_of_length = 4 # length of the (length of the received message)
-    recvd_msg_length_encoded = sock.recv(length_of_length, socket.MSG_WAITALL) # reads the message's (from sending socket) length
-    recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the 32-bit binary value as an int; big-endian
-    recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL)# reads the message
+def recv_msg(sock, exit):
+    # receives decoded message length and message from source; if can't throw's an error
+    try:
+        print ("Receiving RPC msg from source...")
+        # Receive at most msg_length bytes
+        # Returns value received
+        length_of_length = 4 # length of the (length of the received message)
+        recvd_msg_length_encoded = sock.recv(length_of_length, socket.MSG_WAITALL) # reads the message's (from sending socket) length
+        recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the 32-bit binary value as an int; big-endian
+        recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL)# reads the message
 
-    if (len(recvd_msg) == 0):
-        # recv gives 0 result if the connection has been closed
-        print("Connection terminated.") 
-    elif (len(recvd_msg) != recvd_msg_length):
-        print("Incomplete message.") 
-    else:
-        recvd_msg = json.loads(recvd_msg.decode('utf-8')) # decodes the received message
-        return recvd_msg 
+        if (len(recvd_msg) == 0):
+            # recv gives 0 result if the connection has been closed
+            print("Connection terminated.") 
+        elif (len(recvd_msg) != recvd_msg_length):
+            print("Incomplete message.") 
+        else:
+            recvd_msg = json.loads(recvd_msg.decode('utf-8')) # decodes the received message
+            return recvd_msg
+    except ConnectionResetError:
+        print("Connection dropped.")
+        if (sock is not None):
+            sock.close()
+        if (exit):
+            sys.exit()
+    except AttributeError:
+        print ("Cannot decode message.")
+        if (sock is not None):
+            sock.close()
+        if (exit):
+            sys.exit()
 
-# Purpose & Behavior: Starts TCP connection from this client to given server
+# Purpose & Behavior: Starts TCP connection from this source to dest
 # Input: destination host, destination port lower bound & upper bound, timeout for socket, and boolean
 # indicating whether to exit the system or not.
 # Output: Socket where TCP connection is created.

@@ -80,49 +80,31 @@ def lock_release(lock, requester):
 # Input: server's unique id, server's src port, server's src ip, and the socket
 # connects server to viewleader 
 # Output: None
-def heartbeat(new_id, port, addr, sock):
+def heartbeat(new_id, port, addr, sock, epoch):
     # tuple that we set the corresponding server addr:port to if the heartbeat is accepted
     heartbeats_value = (time.time(), 'working', new_id)
+
+    accept_tuple = ("Heartbeat was accepted.", epoch)
+    reject_tuple = ("Heartbeat was rejected.", epoch)
 
     if ((addr, port) in heartbeats):
         last_timestamp, status, current_id = heartbeats[(addr, port)]
         if (new_id == current_id):      
             if (status == 'working'): 
                 print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-                common_functions.send_msg(sock, "Heartbeat was accepted.")
+                common_functions.send_msg(sock, accept_tuple, False)
                 heartbeats[(addr, port)] = heartbeats_value
             else:
                 print ("Rejecting heartbeat from host: " + addr + ":" + str(port) + " because server failed.")
-                common_functions.send_msg(sock, "Heartbeat was rejected.")
+                common_functions.send_msg(sock, reject_tuple, False)
         else: 
             print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-            common_functions.send_msg(sock, "Heartbeat was accepted.")
+            common_functions.send_msg(sock, accept_tuple, False)
             heartbeats[(addr, port)] = heartbeats_value
     else:
         print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-        common_functions.send_msg(sock, "Heartbeat was accepted.")
+        common_functions.send_msg(sock, accept_tuple, False)
         heartbeats[(addr, port)] = heartbeats_value
-
-def setr(key, value):
-    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
-    replica_buckets = bucket_allocator(key, value)
-    # store and write distributed commit 
-    # for (ip, port) in replica_buckets:
-
-def getr(key):
-    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
-    replica_buckets = bucket_allocator(key, value)
-
-    for (server_hash, (addr, port)) in replica_buckets:
-        server_sock = create_connection(addr, port, port, None, True) 
-        send_msg(server_sock, {'cmd': 'get_key', 'key': key}) 
-        response_key = recv_msg(server_sock) # desired value associated with the given key from DHT
-
-        if (response_key == False):
-            response =  "No key found in any of the replica servers."
-        else:
-            response = response_key
-    return response
 
 def hash_key(d):
     sha1 = hashlib.sha1(d)
@@ -157,8 +139,8 @@ def update_DHT():
     for (addr, port) in addr_port_tuple_lst:
         if ((addr, port) not in servers_in_dict): 
             server_sock = create_connection(addr, port, port, None, True) 
-            send_msg(server_sock, {'cmd': 'get_id'}) 
-            server_id = recv_msg(server_sock) # unique server id
+            send_msg(server_sock, {'cmd': 'get_id'}, False) 
+            server_id = recv_msg(server_sock, False) # unique server id
             server_hash = hash_key(server_id)
             server_ordered_dict[str(server_hash)] = (addr, port)
 
