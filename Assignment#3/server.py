@@ -127,7 +127,6 @@ class Server:
         elif (function_from_cmd == "rebalance"):
         else:
             print ("Rejecting RPC request because function is unknown.")
-
         return response
 
     def start(self):
