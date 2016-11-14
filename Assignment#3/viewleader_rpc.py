@@ -4,6 +4,7 @@ from collections import deque
 heartbeats = {}
 view = []
 locks_held = {}
+# dict of (server_hash: ((addr, port), server_id)) for all replica servers
 server_ordered_dict = OrderedDict()
 replica_count = 0
 HASH_MAX = 0
@@ -118,7 +119,7 @@ def update_DHT():
         replica_count = len(view)
 
     for ((addr, port), server_id) in view:
-        addr_port_tuple_lst.append(addr, port)
+        addr_port_tuple_lst.append(((addr, port), server_id))
 
     # checks if dict is non-empty
     if (server_ordered_dict):
@@ -135,14 +136,14 @@ def update_DHT():
             server_ordered_dict.remove(server_hash)
         
     # adds active servers that are not already in DHT, to DHT with new hashes
-    for (addr, port) in addr_port_tuple_lst:
-        if ((addr, port) not in servers_in_dict): 
+    for ((addr, port), server_id) in addr_port_tuple_lst:
+        if (((addr, port), server_id) not in servers_in_dict): 
             server_sock = create_connection(addr, port, port, None, True) 
             send_msg(server_sock, {'cmd': 'get_id'}, False) 
             server_id = recv_msg(server_sock, False) # unique server id
             server_sock.close()
             server_hash = hash_key(server_id)
-            server_ordered_dict[str(server_hash)] = (addr, port)
+            server_ordered_dict[str(server_hash)] = ((addr, port), server_id)
 
     HASH_MAX = len(server_ordered_dict)
 
@@ -150,7 +151,7 @@ def bucket_allocator(key, value):
     update_DHT() #update DHT
     key_hash = hash_key(key)
 
-    # list of (server_hash, (addr, port)) for all replica servers associated with the given key
+    # list of ((addr, port), server_id) for all replica servers associated with the given key
     replica_buckets = []
     bucket_count = 0
 

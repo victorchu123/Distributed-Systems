@@ -14,33 +14,36 @@ def get_viewleader_info(viewleader_sock):
     active_servers = viewleader_response['Active servers']
     return (active_servers, epoch)
 
-def broadcast(view, object_to_send, epoch):
-    for (addr, port, server_id) in view:
+def broadcast(replicas, object_to_send, epoch):
+    for ((addr, port), server_id) in replicas:
         if (object_to_send['cmd'] == 'request_vote'):
             object_to_send['epoch'] = epoch
             object_to_send['server_id'] = server_id
-        server_sock = common_functions.create_connection(addr, port, port, None, True)
+        server_sock = common_functions.create_connection(addr, port, port, None, False)
         common_functions.send_msg(server_sock, object_to_send, False)
+        if (object_to_send['cmd'] == 'getr'):
+            response_key = recv_msg(server_sock, False) # desired value associated with the given key from DHT
+            if (response_key != ''):
+                return {'status': 'success', 'result': response_key}
+        elif (object_to_send['cmd'] == 'setr'):
+            response = recv_msg(server_sock, False)
+    if (response_key is not None):
+        if (response_key == ''):
+            result = "No key found in any of the replica servers."
+            response =  {'status': 'fail', 'result': result}
+            return response
     server_sock.close()
 
-def distributed_commit():
+def distributed_commit(replicas):
     viewleader_sock = common_functions.create_connection(client.dest_host, client.dest_port_low, client.dest_port_high, None, True)
     active_servers, epoch = get_viewleader_info(viewleader_sock)
     viewleader_sock.close()
 
     votes_received = 0
     votes_expected = len(active_servers)
-
-    view = []
-
-    for (info, server_id) in active_servers:
-        info_split = info.split(":")
-        view.append((entry_split[0], int(entry_split[1]), server_id))
-    
     abort = False
-
     vote_request = {'cmd': 'request_vote'}
-    broadcast(view, votes_request, epoch)
+    broadcast(replicas, votes_request, epoch)
 
     bound_socket, src_port = common_functions.start_listening(37000, 37010, 10)
 
@@ -61,34 +64,34 @@ def distributed_commit():
             abort = True
 
     if (abort):
-        broadcast(view, global_abort, epoch)
+        broadcast(replicas, global_abort, epoch)
         print ("Commit failed. Aborting...")
+        return False
     else:
-        broadcast(view, global_commit, epoch)
+        broadcast(replicas, global_commit, epoch)
         print ("Commit succeeded.")
+        return True
 
 def setr(key, value):
     viewleader_sock = common_functions.create_connection(client.dest_host, client.dest_port_low, client.dest_port_high, None, True)
+    active_servers, epoch = get_viewleader_info(viewleader_sock)
     replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key, 'val': value})
     viewleader_sock.close()
-    # store and write distributed commit 
-    # for (ip, port) in replica_buckets:
+    length_of_bucket = len(replica_buckets)
+
+    if (length_of_bucket == 0):
+        return "Cannot store value because no servers are available."
+    else:
+        if (distributed_commit(replica_buckets)):
+            broadcast(replica_buckets, {'cmd': 'setr', 'key': key, 'val': value}, epoch)
+            return "Stored values in replica servers."
+        else:
+            return "Cannot store value because one of the servers aborted."
 
 def getr(key):
     viewleader_sock = common_functions.create_connection(client.dest_host, client.dest_port_low, client.dest_port_high, None, True) 
     replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key})
+    active_servers, epoch = get_viewleader_info(viewleader_sock)
     viewleader_sock.close()
-
-    for (server_hash, (addr, port)) in replica_buckets:
-        server_sock = common_functions.create_connection(addr, port, port, None, True) 
-        send_msg(server_sock, {'cmd': 'get_key', 'key': key}, False) 
-        response_key = recv_msg(server_sock, False) # desired value associated with the given key from DHT
-        viewleader_sock.close()
-
-        if (response_key != False):
-            return {'status': 'success', 'result': response_key}
-
-    if (response_key == False):
-        result = "No key found in any of the replica servers."
-        response =  {'status': 'fail', 'result': result}
+    response = broadcast(replica_buckets, {'cmd': 'getr', 'key': key}, epoch)
     return response

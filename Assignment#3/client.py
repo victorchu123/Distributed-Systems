@@ -119,7 +119,6 @@ class Client:
                 print (client_rpc.getr(args.key))
             else: 
                 print (client_rpc.setr(args.key, args.val))
-
         while (stop == False):
             sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
             # sends encoded message length and message to server/viewleader; if can't throw's an error

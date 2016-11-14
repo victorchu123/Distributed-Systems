@@ -109,13 +109,18 @@ class Server:
                 response = {'status': 'success', 'result': result, 'id': unique_id}
         elif (function_from_cmd == "get_id"):
             response = self.unique_id
-        elif (function_from_cmd == "get_key"):
+        elif (function_from_cmd == "getr"):
             key = recvd_msg["key"]
             try:
                 response = self.bucket[key]
             except LookupError:
-                response = False
-        elif (function_from_cmd == 'request_vote'):
+                response = ''
+        elif (function_from_cmd == "setr"):
+            key = recvd_msg["key"]
+            value = recvd_msg["val"]
+            self.bucket[key] = value
+            response = "Setting bucket[{}] to {}.".format(key, value)
+        elif (function_from_cmd == "request_vote"):
             viewleader_epoch = recvd_msg["epoch"]
             server_id = recvd_msg["server_id"]
             response = vote(viewleader_epoch, server_id)
