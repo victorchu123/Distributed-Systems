@@ -46,6 +46,9 @@ def broadcast(replicas, object_to_send, epoch, timeout):
             if (rpc_command == 'request_vote'):
                 abort = True
                 return {'cmd': 'abort'}
+        except Exception as e:
+            print ("Couldn't connect to current replica server: ", e)
+            continue 
     if (rpc_command == 'request_vote'):
         return {'cmd': 'commit'}
     if (response_key is not None):
