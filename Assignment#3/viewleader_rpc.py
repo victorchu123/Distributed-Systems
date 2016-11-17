@@ -1,13 +1,14 @@
-import time, socket, common_functions, view_leader, hashlib
+import time, socket, common_functions, hashlib, uuid
 from collections import deque
 
 heartbeats = {}
 view = []
 locks_held = {}
 # dict of (server_hash: ((addr, port), server_id)) for all replica servers
-server_ordered_dict = OrderedDict()
+server_dict = {}
 replica_count = 0
-HASH_MAX = 0
+bucket_count = 0
+HASH_MAX = 160
 
 # Purpose & Behavior: Returns current view and epoch
 # Input: epoch from viewleader
@@ -80,99 +81,173 @@ def lock_release(lock, requester):
 # Input: server's unique id, server's src port, server's src ip, and the socket
 # connects server to viewleader 
 # Output: None
-def heartbeat(new_id, port, addr, sock, epoch):
+def heartbeat(new_id, port, addr, sock):
     # tuple that we set the corresponding server addr:port to if the heartbeat is accepted
     heartbeats_value = (time.time(), 'working', new_id)
 
-    accept_tuple = ("Heartbeat was accepted.", epoch)
-    reject_tuple = ("Heartbeat was rejected.", epoch)
+    accept_tuple = ("Heartbeat was accepted.")
+    reject_tuple = ("Heartbeat was rejected.")
 
     if ((addr, port) in heartbeats):
         last_timestamp, status, current_id = heartbeats[(addr, port)]
         if (new_id == current_id):      
             if (status == 'working'): 
                 print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-                common_functions.send_msg(sock, accept_tuple, False)
                 heartbeats[(addr, port)] = heartbeats_value
+                common_functions.send_msg(sock, accept_tuple, False)
             else:
                 print ("Rejecting heartbeat from host: " + addr + ":" + str(port) + " because server failed.")
                 common_functions.send_msg(sock, reject_tuple, False)
-        else: 
+        else:
             print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-            common_functions.send_msg(sock, accept_tuple, False)
             heartbeats[(addr, port)] = heartbeats_value
+            common_functions.send_msg(sock, accept_tuple, False)
     else:
         print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-        common_functions.send_msg(sock, accept_tuple, False)
         heartbeats[(addr, port)] = heartbeats_value
+        common_functions.send_msg(sock, accept_tuple, False)
 
 def hash_key(d):
-    sha1 = hashlib.sha1(d)
-    return int(sha1.hexdigest(), 16) % HASH_MAX
+    d_encoded = d.encode('utf-8')
+    sha1 = hashlib.sha1(d_encoded)
+    # print ("HASH_MAX : {}".format(HASH_MAX))
+    try:
+        return int(sha1.hexdigest(), 16) % HASH_MAX
+    except ZeroDivisionError as e:
+        print ("Cannot mod by 0: ", e)
+
+def is_val_in_server_dict(val):
+    for key, value in server_dict.items():
+        if (server_dict[key] == val):
+            return True
+    return False
 
 def update_DHT():
-    addr_port_tuple_lst = []
 
+    global replica_count
     if (len(view) >= 3):
         replica_count = 3
     else:
         replica_count = len(view)
 
-    for ((addr, port), server_id) in view:
-        addr_port_tuple_lst.append(((addr, port), server_id))
+    print ("View: {}".format(view))
 
+    servers_in_dict = []
     # checks if dict is non-empty
-    if (server_ordered_dict):
+    if (len(servers_in_dict) != 0):
+        print ("Removing inactive servers...")
         # removes inactive servers from DHT and keeps track of servers in dict
         server_hashes_to_remove = []
-        servers_in_dict = []
 
-        for server_hash, value in server_ordered_dict.items():
-            if (value not in addr_port_tuple_lst):
+        for server_hash, value in server_dict.items():
+            if (value not in view):
                 server_hashes_to_remove.append(server_hash)
             servers_in_dict.append(value) 
 
         for server_hash in server_hashes_to_remove:
-            server_ordered_dict.remove(server_hash)
+            del server_dict[server_hash]
         
-    # adds active servers that are not already in DHT, to DHT with new hashes
-    for ((addr, port), server_id) in addr_port_tuple_lst:
-        if (((addr, port), server_id) not in servers_in_dict): 
-            server_sock = create_connection(addr, port, port, None, True) 
-            send_msg(server_sock, {'cmd': 'get_id'}, False) 
-            server_id = recv_msg(server_sock, False) # unique server id
+    # adds active servers from view that are not already in DHT, to DHT with new hashes
+    for ((addr, port), server_id) in view:
+        if (is_val_in_server_dict(((addr, port), server_id)) == False): 
+            server_sock = common_functions.create_connection(addr, port, port, None, True) 
+            common_functions.send_msg(server_sock, {'cmd': 'get_id'}, False) 
+            response = common_functions.recv_msg(server_sock, False)
+            # print ("Response: {}".format(response))
+            server_id = uuid.UUID(response).hex # unique server id
+            # print ("Server ID: {}".format(server_id))
             server_sock.close()
             server_hash = hash_key(server_id)
-            server_ordered_dict[str(server_hash)] = ((addr, port), server_id)
+            # print ("Server Hash: {}".format(server_hash))
+            server_dict[server_hash] = ((addr, port), server_id)
 
-    HASH_MAX = len(server_ordered_dict)
+    print ("Server Dict: {}".format(server_dict))
 
-def bucket_allocator(key, value):
+def bucket_allocator(key):
     update_DHT() #update DHT
     key_hash = hash_key(key)
 
     # list of ((addr, port), server_id) for all replica servers associated with the given key
     replica_buckets = []
-    bucket_count = 0
+    server_hashes = []
 
-    last_dict_elem = server_ordered_dict.items()[len(server_ordered_dict - 1)]
+    if (server_dict is not None):
+        for server_hash, value in server_dict.items():
+            server_hashes.append(server_hash)
 
-    for server_hash, value in server_ordered_dict.items():
-        if (server_hash >= key_hash) and (bucket_count < replica_count):
-            replica_buckets.append(value)
-            bucket_count += 1
-            if ((server_hash, value) == last_dict_elem) and (bucket_count < replica_count):
-                if (replica_count == 2):
-                    first_dict_elem = server_ordered_dict.items()[0]
-                    replica_buckets.append(first_dict_elem[0])
-                    bucket_count += 1
-                elif (replica_count == 1):
-                    first_dict_elem = server_ordered_dict.items()[0]
-                    second_dict_elem = server_ordered_dict.items()[1]
-                    replica_buckets.append(first_dict_elem[0])
-                    bucket_count += 1
-                    replica_buckets.append(second_dict_elem[0])
-                    bucket_count += 1
+    # print ("Server Hashes: {}".format(server_hashes))
+
+    last_dict_elem = None
+    server_hashes_in_order = server_hashes
+    server_hashes_in_order.sort()
+    print ("Server Hash Ordered List : {}".format(server_hashes_in_order))
+    server_hashes_length = len(server_hashes_in_order)
+    if (server_hashes_length != 0):
+        last_server_hash = server_hashes_in_order[server_hashes_length-1]
+        last_dict_elem = server_dict[last_server_hash]
+
+    global bucket_count
+    has_gtr_hash = False
+
+    if (server_dict is not None):
+        for server_hash, value in server_dict.items():
+            print ("Server Hash : {}".format(server_hash))
+            print ("Key Hash : {}".format(key_hash))
+            print ("Bucket Count : {}".format(bucket_count))
+            print ("Replica Count : {}".format(replica_count))
+            if (server_hash >= key_hash) and (bucket_count < replica_count):
+                print ("Found a suitable replica bucket...")
+                replica_buckets.append(value)
+                bucket_count += 1 
+                has_gtr_hash = True
+                print ("Value : {}".format(value))
+                print ("Last Dict Elem : {}".format(last_dict_elem))
+                if (value == last_dict_elem) and (bucket_count < replica_count):
+                    if (replica_count == 2):
+                        first_server_hash = server_hashes_in_order[0]
+                        first_dict_elem = server_dict[first_server_hash]
+                        replica_buckets.append(first_dict_elem)
+                        bucket_count += 1
+                    elif (replica_count == 3):
+                        first_server_hash = server_hashes_in_order[0]
+                        first_dict_elem = server_dict[first_server_hash]
+                        second_server_hash = server_hashes_in_order[1]
+                        second_dict_elem = server_dict[second_server_hash]
+                        replica_buckets.append(first_dict_elem)
+                        bucket_count += 1
+                        replica_buckets.append(second_dict_elem)
+                        bucket_count += 1
+
+        if (has_gtr_hash == False) and (replica_count != 0):
+            print ("Couldn't find a suitable replica bucket; wrapping around and using first replica buckets...")
+            if (replica_count == 1):
+                first_server_hash = server_hashes_in_order[0]
+                first_dict_elem = server_dict[first_server_hash]
+                replica_buckets.append(first_dict_elem)
+                bucket_count += 1
+            elif (replica_count == 2):
+                first_server_hash = server_hashes_in_order[0]
+                first_dict_elem = server_dict[first_server_hash]
+                second_server_hash = server_hashes_in_order[1]
+                second_dict_elem = server_dict[second_server_hash]
+                replica_buckets.append(first_dict_elem)
+                bucket_count += 1
+                replica_buckets.append(second_dict_elem)
+                bucket_count += 1
+            elif (replica_count == 3):
+                first_server_hash = server_hashes_in_order[0]
+                first_dict_elem = server_dict[first_server_hash]
+                second_server_hash = server_hashes_in_order[1]
+                second_dict_elem = server_dict[second_server_hash]
+                third_server_hash = server_hashes_in_order[2]
+                third_dict_elem = server_dict[third_server_hash]
+                replica_buckets.append(first_dict_elem)
+                bucket_count += 1
+                replica_buckets.append(second_dict_elem)
+                bucket_count += 1
+                replica_buckets.append(third_dict_elem)
+                bucket_count += 1
+
     return replica_buckets
 
 

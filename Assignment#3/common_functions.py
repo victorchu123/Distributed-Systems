@@ -7,7 +7,7 @@ import socket, json, struct, sys
 def send_msg(sock, object_to_send, exit):
     # sends encoded message length and message to destination; if can't throw's an error
     try:
-        print ("Sending RPC msg to destination...")
+        # print ("Sending RPC msg to destination: {}...".format(object_to_send))
         # serializing object into a JSON formatted stream and then encoded 
         # into a unicode string.
         send_msg_encoded = json.dumps(object_to_send).encode()
@@ -29,14 +29,13 @@ def send_msg(sock, object_to_send, exit):
 def recv_msg(sock, exit):
     # receives decoded message length and message from source; if can't throw's an error
     try:
-        print ("Receiving RPC msg from source...")
         # Receive at most msg_length bytes
         # Returns value received
         length_of_length = 4 # length of the (length of the received message)
         recvd_msg_length_encoded = sock.recv(length_of_length, socket.MSG_WAITALL) # reads the message's (from sending socket) length
         recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the 32-bit binary value as an int; big-endian
         recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL)# reads the message
-
+        # print ("Received RPC msg from source: {}...".format(recvd_msg))
         if (len(recvd_msg) == 0):
             # recv gives 0 result if the connection has been closed
             print("Connection terminated.") 
@@ -47,16 +46,14 @@ def recv_msg(sock, exit):
             return recvd_msg
     except ConnectionResetError:
         print("Connection dropped.")
-        if (sock is not None):
-            sock.close()
-        if (exit):
-            sys.exit()
     except AttributeError:
         print ("Cannot decode message.")
-        if (sock is not None):
-            sock.close()
-        if (exit):
-            sys.exit()
+    except Exception as e:
+        print ("Couldn't receive message: ", e)
+    if (sock is not None):
+        sock.close()
+    if (exit):
+        sys.exit()
 
 # Purpose & Behavior: Starts TCP connection from this source to dest
 # Input: destination host, destination port lower bound & upper bound, timeout for socket, and boolean
@@ -65,6 +62,7 @@ def recv_msg(sock, exit):
 def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
     dest_port = dest_port_low
     while (dest_port <= dest_port_max):
+        # print ("Creating connection with destination..")
         # print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
         # Note these calls may throw an exception if it fails
         try:
@@ -78,7 +76,7 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
                 if (exit):
                     sys.exit()
                 else: 
-                    raise Exception
+                    raise socket.error
             continue
     return sock
 

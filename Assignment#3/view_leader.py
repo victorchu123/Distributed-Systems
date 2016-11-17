@@ -2,12 +2,11 @@
 
 import time, server, common_functions, sys, socket, viewleader_rpc
 
-epoch = 0
-
 class ViewLeader():
 
     def __init__(self):
         self.src_port = 39000
+        self.epoch = 0
         self.start()
 
     def start(self):
@@ -26,10 +25,9 @@ class ViewLeader():
                 if (accepted_port is not None): # checks if there is an accepted_port
                     recvd_msg = common_functions.recv_msg(sock, False) # receives message from client/server
                     self.process_msg(recvd_msg, addr, sock)
-                    self.update_view() # updates view
+                self.update_view() # updates view
             except socket.timeout:
-                # updates view when socket timesout
-                self.update_view()
+                self.update_view() # updates view
                 continue
 
     # Purpose & Behavior: Processes commands from the received message and calls upon the 
@@ -40,12 +38,11 @@ class ViewLeader():
         function_from_cmd = recvd_msg["cmd"] # takes function arguments from received dict
 
         if (function_from_cmd == 'query_servers'):
-            global epoch
-            common_functions.send_msg(sock, viewleader_rpc.query_servers(epoch), False)
+            common_functions.send_msg(sock, viewleader_rpc.query_servers(self.epoch), False)
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             port = recvd_msg["args"][1] # src port
-            viewleader_rpc.heartbeat(new_id, port, addr, sock, epoch)
+            viewleader_rpc.heartbeat(new_id, port, addr, sock)
         elif (function_from_cmd == 'lock_get'):
             lock_name = recvd_msg["lock_name"]
             requester_id = recvd_msg["requester_id"]
@@ -64,10 +61,11 @@ class ViewLeader():
                 common_functions.send_msg(sock, "{'status': 'not ok'}", False)
         elif (function_from_cmd == 'get_buckets'):
             key = recvd_msg["key"]
-            if (value is not None):
-                value = recvd_msg["val"]
-            replica_buckets = viewleader_rpc.bucket_allocator(key, value)
+            replica_buckets = viewleader_rpc.bucket_allocator(key)
             common_functions.send_msg(sock, replica_buckets, False)
+        elif (function_from_cmd == 'update_view'):
+            curr_epoch = self.update_view()
+            common_functions.send_msg(sock, {'Current Epoch': curr_epoch}, False)
         else:
             print ("Rejecting RPC request because function is unknown.")
 
@@ -79,7 +77,6 @@ class ViewLeader():
         # dict of all received heartbeats in the form of {'(server addr, server port): (last_timestamp, status, current_id)'}
         heartbeats = viewleader_rpc.heartbeats
         view = viewleader_rpc.view # list of all active servers
-        global epoch
 
         # adds server to a list if they haven't responded in more than 30 seconds
         for key, value in heartbeats.items():
@@ -92,22 +89,23 @@ class ViewLeader():
             last_timestamp, status, current_id = heartbeats[server]
             heartbeats[server] = (last_timestamp, 'failed', current_id)    
 
-        # adds working servers to view and removes failing servers (also updates epoch when either of these actions happen)
+        # adds working servers to view and removes failing servers (also updates self.epoch when either of these actions happen)
         for key, value in heartbeats.items():
             last_timestamp, status, server_id = value
             if (status == 'working') and ((key, server_id) not in view):
                 view.append((key, server_id))
-                epoch = epoch + 1
+                self.epoch = self.epoch + 1
                 # send rebalance RPC request to server
                 # rebalance(view)
                 
             elif (status == 'failed') and ((key, server_id) in view):
                 view.remove((key, server_id))
-                epoch = epoch + 1
+                self.epoch = self.epoch + 1
                 # send rebalance RPC request to server
                 # rebalance(view)
+        return self.epoch
 
-    def rebalance(view):
+    def rebalance(self, view):
         for ((addr, port), server_id) in view:
             server_sock = create_connection(addr, port, port, None, True) 
             send_msg(server_sock, {'cmd': 'rebalance', 'view': view}, False)

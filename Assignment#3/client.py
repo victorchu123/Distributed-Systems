@@ -5,11 +5,6 @@ class Client:
 
     def __init__(self): 
         self.start()
-        self.dest_host = ''
-        self.dest_port_low = 0
-        self.dest_port_high = 0
-        self.timeout = 1
-        self.dest_name = ''
 
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
     # and their respective inputs. 
@@ -88,24 +83,22 @@ class Client:
 
         viewleader_args = ['query_servers', 'lock_get', 'lock_release']
 
+        self.timeout = 1
         # sets destination port ranges and destination hosts based on the RPC functions called
         if (args.cmd in viewleader_args):
             self.dest_host = str(args.viewleader)
             self.dest_port_low = 39000
             self.dest_port_high = 39010
-            self.timeout = 1
             self.dest_name = 'viewleader'
         elif (args.cmd == 'getr' or args.cmd == 'setr'):
             self.dest_host = str(args.viewleader)
             self.dest_port_low = 39000
             self.dest_port_high = 39010
-            self.timeout = 1
             self.dest_name = 'viewleader_and_server'
         else:
             self.dest_host = str(args.server)
             self.dest_port_low = 38000
             self.dest_port_high = 38010
-            self.timeout = 1
             self.dest_name = 'server'
 
         args_dict = self.create_dict(args)
@@ -116,9 +109,9 @@ class Client:
         if (self.dest_name == 'viewleader_and_server'):
             stop = True
             if (args.cmd == 'getr'):
-                print (client_rpc.getr(args.key))
+                print (client_rpc.getr(args.key, self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout))
             else: 
-                print (client_rpc.setr(args.key, args.val))
+                print (client_rpc.setr(args.key, args.val, self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout))
         while (stop == False):
             sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
             # sends encoded message length and message to server/viewleader; if can't throw's an error
