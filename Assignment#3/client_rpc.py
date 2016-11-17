@@ -25,7 +25,7 @@ def broadcast(replicas, object_to_send, epoch, timeout):
             object_to_send['epoch'] = epoch
             object_to_send['server_id'] = str(server_id)
         try: 
-            server_sock = common_functions.create_connection(addr, port, port, 5, False)
+            server_sock = common_functions.create_connection(addr, port, port, timeout, False)
             # print ("Sending {} to replica server {}...".format(object_to_send, (addr, port)))
             common_functions.send_msg(server_sock, object_to_send, False)
 
@@ -54,14 +54,18 @@ def broadcast(replicas, object_to_send, epoch, timeout):
         return response_key
 
 def distributed_commit(replicas, dest_host, dest_port_low, dest_port_high, timeout):
-    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, 1, True)
-    active_servers, epoch = get_viewleader_info(viewleader_sock)
+    try:
+        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+        active_servers, epoch = get_viewleader_info(viewleader_sock)
+    except Exception as e:
+        print ("Couldn't establish a connection with viewleader: ", e)
+        
     viewleader_sock.close()
 
     votes_received = 0
     votes_expected = len(active_servers)
     vote_request = {'cmd': 'request_vote'}
-    response = broadcast(replicas, vote_request, epoch, timeout)
+    response = broadcast(replicas, vote_request, epoch, 5)
     vote = response['cmd']
 
     # sending global abort
@@ -74,21 +78,28 @@ def distributed_commit(replicas, dest_host, dest_port_low, dest_port_high, timeo
         return True
 
 def setr(key, value, dest_host, dest_port_low, dest_port_high, timeout):
-    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-    active_servers, epoch = get_viewleader_info(viewleader_sock)
+    try:
+        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+        active_servers, epoch = get_viewleader_info(viewleader_sock)
+    except Exception as e:
+        print ("Couldn't establish a connection with viewleader: ", e)
     viewleader_sock.close()
 
-    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-    replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key, 'val': value})
-    print ("Replicas : {}".format(replica_buckets))
+    try:
+        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+        replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key, 'val': value})
+        print ("Replicas : {}".format(replica_buckets))
+    except Exception as e:
+        print ("Couldn't establish a connection with viewleader: ", e)
+
     viewleader_sock.close()
     length_of_bucket = len(replica_buckets)
 
     if (length_of_bucket == 0):
         return "Cannot store value because no servers are available."
     else:
-        if (distributed_commit(replica_buckets, dest_host, dest_port_low, dest_port_high, timeout)):
-            broadcast(replica_buckets, {'cmd': 'setr', 'key': key, 'val': value}, epoch, timeout)
+        if (distributed_commit(replica_buckets, dest_host, dest_port_low, dest_port_high, 3)):
+            broadcast(replica_buckets, {'cmd': 'setr', 'key': key, 'val': value, 'id': 0}, epoch, 5)
             return "Stored values in replica servers."
         else:
             return "Cannot store value because one of the servers aborted."
@@ -102,5 +113,5 @@ def getr(key, dest_host, dest_port_low, dest_port_high, timeout):
     replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key})
     viewleader_sock.close()
 
-    response = broadcast(replica_buckets, {'cmd': 'getr', 'key': key}, epoch, timeout)
+    response = broadcast(replica_buckets, {'cmd': 'getr', 'key': key, 'id': 0}, epoch, 5)
     return response

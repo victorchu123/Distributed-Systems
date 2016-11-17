@@ -61,15 +61,23 @@ class Server:
                     recvd_msg = common_functions.recv_msg(sock, False)
                     response = self.process_msg_from_client(recvd_msg)
                     common_functions.send_msg(sock, response, False)
+                    print ("Finished sending message ({}) from server to dest...".format(response))
+
+                    if (time.time() - self.last_heartbeat_time >= 10.0):
+                        print ("Sending RPC Message and a RPC heartbeat...")
+                        try:
+                            self.last_heartbeat_time = time.time()
+                            self.send_and_recv_heartbeat(src_port)
+                        except Exception as e:
+                            print ('RPC Heartbeat rejected...')
             except socket.timeout:
-                try:
-                    self.last_heartbeat_time = time.time()
-                    self.send_and_recv_heartbeat(src_port)
-                except Exception as e:
-                    print ('Heartbeat rejected, will try again in 10 seconds...')
+                if (time.time() - self.last_heartbeat_time >= 10.0):
+                    try:
+                        self.last_heartbeat_time = time.time()
+                        self.send_and_recv_heartbeat(src_port)
+                    except Exception as e:
+                        print ('Heartbeat rejected, will try again in 10 seconds...')
                 continue
-            except socket.error:
-                
 
     def vote(self, epoch, server_id):
         print ("Comparing viewleader epoch ({}) to our epoch ({})...".format(epoch, self.epoch))
@@ -145,6 +153,7 @@ class Server:
         bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
         self.accept_and_handle_messages(bound_socket, src_port)
         sock.close() # closes connection with server
+
 
 if __name__ == '__main__':
     server = Server()

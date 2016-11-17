@@ -123,7 +123,6 @@ def is_val_in_server_dict(val):
     return False
 
 def update_DHT():
-
     global replica_count
     if (len(view) >= 3):
         replica_count = 3
@@ -150,13 +149,13 @@ def update_DHT():
     # adds active servers from view that are not already in DHT, to DHT with new hashes
     for ((addr, port), server_id) in view:
         if (is_val_in_server_dict(((addr, port), server_id)) == False): 
-            server_sock = common_functions.create_connection(addr, port, port, None, True) 
-            common_functions.send_msg(server_sock, {'cmd': 'get_id'}, False) 
-            response = common_functions.recv_msg(server_sock, False)
+            # server_sock = common_functions.create_connection(addr, port, port, 2, True) 
+            # common_functions.send_msg(server_sock, {'cmd': 'get_id'}, False) 
+            # response = common_functions.recv_msg(server_sock, False)
             # print ("Response: {}".format(response))
-            server_id = uuid.UUID(response).hex # unique server id
+            # server_id = uuid.UUID(response).hex # unique server id
             # print ("Server ID: {}".format(server_id))
-            server_sock.close()
+            # server_sock.close()
             server_hash = hash_key(server_id)
             # print ("Server Hash: {}".format(server_hash))
             server_dict[server_hash] = ((addr, port), server_id)
@@ -180,7 +179,7 @@ def bucket_allocator(key):
     last_dict_elem = None
     server_hashes_in_order = server_hashes
     server_hashes_in_order.sort()
-    print ("Server Hash Ordered List : {}".format(server_hashes_in_order))
+    # print ("Server Hash Ordered List : {}".format(server_hashes_in_order))
     server_hashes_length = len(server_hashes_in_order)
     if (server_hashes_length != 0):
         last_server_hash = server_hashes_in_order[server_hashes_length-1]
@@ -191,10 +190,10 @@ def bucket_allocator(key):
 
     if (server_dict is not None):
         for server_hash, value in server_dict.items():
-            print ("Server Hash : {}".format(server_hash))
-            print ("Key Hash : {}".format(key_hash))
-            print ("Bucket Count : {}".format(bucket_count))
-            print ("Replica Count : {}".format(replica_count))
+            # print ("Server Hash : {}".format(server_hash))
+            # print ("Key Hash : {}".format(key_hash))
+            # print ("Bucket Count : {}".format(bucket_count))
+            # print ("Replica Count : {}".format(replica_count))
             if (server_hash >= key_hash) and (bucket_count < replica_count):
                 print ("Found a suitable replica bucket...")
                 replica_buckets.append(value)

@@ -17,7 +17,7 @@ def send_msg(sock, object_to_send, exit):
         sock.sendall(send_msg_length_encoded) # sends encoded "message length"
         sock.sendall(send_msg_encoded) # sends encoded message
     except Exception as e: 
-        print ("Failed send over whole message.", e)
+        print ("Failed send over whole message ({}): ".format(object_to_send), e)
         if (sock is not None):
             sock.close()
         if (exit):
@@ -49,7 +49,7 @@ def recv_msg(sock, exit):
     except AttributeError:
         print ("Cannot decode message.")
     except Exception as e:
-        print ("Couldn't receive message: ", e)
+        print ("Couldn't receive message ({}): ".format(object_to_send), e)
     if (sock is not None):
         sock.close()
     if (exit):
@@ -76,7 +76,7 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
                 if (exit):
                     sys.exit()
                 else: 
-                    raise socket.error
+                    raise Exception
             continue
     return sock
 
@@ -92,7 +92,7 @@ def start_listening(src_port_low, src_port_max, timeout):
         try:
             bound_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             bound_socket.bind(('', src_port)) # binds socket to src port
-            bound_socket.listen(1) # socket starts listening for client
+            bound_socket.listen(3) # socket starts listening for client
             bound_socket.settimeout(timeout)
             break
         except Exception as e:
