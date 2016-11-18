@@ -103,6 +103,7 @@ def setr(key, value, dest_host, dest_port_low, dest_port_high, timeout):
     else:
         if (distributed_commit(replica_buckets, key, dest_host, dest_port_low, dest_port_high, 3)):
             broadcast(replica_buckets, {'cmd': 'setr', 'key': key, 'val': value, 'id': 0}, epoch, 5)
+            broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)
             return "Stored values in replica servers."
         else:
             # broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)

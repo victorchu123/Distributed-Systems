@@ -140,11 +140,6 @@ class Server:
             value = recvd_msg["val"]
             self.bucket[key] = value
             response = {'status': 'success', 'id': unique_id}
-            try:
-                self.in_commit_phase.remove(key)
-            except ValueError:
-                print ("Key is not currently being committed.")
-            # print ("Keys in in_commit_phase: {}".format(self.in_commit_phase))
         elif (function_from_cmd == "request_vote"):
             key = recvd_msg["key"]
             if (key not in self.in_commit_phase): 
