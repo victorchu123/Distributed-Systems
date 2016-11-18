@@ -11,6 +11,7 @@ class Server:
         self.bucket = {}
         self.last_heartbeat_time = time.time()
         self.epoch = 1
+        self.in_commit_phase = []
         self.start()
         
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
@@ -80,8 +81,8 @@ class Server:
                 continue
 
     def vote(self, epoch, server_id):
-        print ("Comparing viewleader epoch ({}) to our epoch ({})...".format(epoch, self.epoch))
-        print ("Comparing viewleader server id ({}) to our server id ({})...".format(server_id, self.unique_id))
+        # print ("Comparing viewleader epoch ({}) to our epoch ({})...".format(epoch, self.epoch))
+        # print ("Comparing viewleader server id ({}) to our server id ({})...".format(server_id, self.unique_id))
 
         if (epoch == self.epoch) and (server_id == self.unique_id):
             return 'commit'
@@ -126,7 +127,7 @@ class Server:
             else:
                 response = {'status': 'success', 'result': result, 'id': unique_id}
         elif (function_from_cmd == "get_id"):
-            print ("Returning service_id to viewleader...".format(self.unique_id))
+            # print ("Returning service_id to viewleader...".format(self.unique_id))
             response = str(self.unique_id)
         elif (function_from_cmd == "getr"):
             key = recvd_msg["key"]
@@ -139,11 +140,34 @@ class Server:
             value = recvd_msg["val"]
             self.bucket[key] = value
             response = {'status': 'success', 'id': unique_id}
+            try:
+                self.in_commit_phase.remove(key)
+            except ValueError:
+                print ("Key is not currently being committed.")
+            # print ("Keys in in_commit_phase: {}".format(self.in_commit_phase))
         elif (function_from_cmd == "request_vote"):
-            viewleader_epoch = recvd_msg["epoch"]
-            server_id = uuid.UUID(recvd_msg["server_id"]).hex
-            response = self.vote(viewleader_epoch, server_id)
+            key = recvd_msg["key"]
+            if (key not in self.in_commit_phase): 
+                self.in_commit_phase.append(key)
+                # print ("Added key to in_commit_phase: {}".format(self.in_commit_phase))
+                viewleader_epoch = recvd_msg["epoch"]
+                server_id = uuid.UUID(recvd_msg["server_id"]).hex
+                response = self.vote(viewleader_epoch, server_id)
+            else:
+                print ("Aborting because there is a pending commit...")
+                response = 'abort'
             print ("Sending vote back to client...")
+        elif (function_from_cmd == "remove_commit"):
+            key = recvd_msg["key"]
+
+            # print ("Keys in in_commit_phase: {}".format(self.in_commit_phase))
+            # print ("Key: {}".format(key))
+
+            try:
+                self.in_commit_phase.remove(key)
+            except ValueError:
+                print ("Key is not currently being committed.")
+            response = {'status': 'success', 'id': unique_id}
         # elif (function_from_cmd == "rebalance"):
         else:
             print ("Rejecting RPC request because function is unknown.")

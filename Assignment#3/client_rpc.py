@@ -47,7 +47,7 @@ def broadcast(replicas, object_to_send, epoch, timeout):
                 abort = True
                 return {'cmd': 'abort'}
         except Exception as e:
-            print ("Couldn't connect to current replica server: ", e)
+            print ("Couldn't connect to current replica server...will continue on remaining replicas: ", e)
             continue 
     if (rpc_command == 'request_vote'):
         return {'cmd': 'commit'}
@@ -56,7 +56,7 @@ def broadcast(replicas, object_to_send, epoch, timeout):
         response_key =  {'status': 'fail', 'result': result}
         return response_key
 
-def distributed_commit(replicas, dest_host, dest_port_low, dest_port_high, timeout):
+def distributed_commit(replicas, key, dest_host, dest_port_low, dest_port_high, timeout):
     try:
         viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
         active_servers, epoch = get_viewleader_info(viewleader_sock)
@@ -67,7 +67,7 @@ def distributed_commit(replicas, dest_host, dest_port_low, dest_port_high, timeo
 
     votes_received = 0
     votes_expected = len(active_servers)
-    vote_request = {'cmd': 'request_vote'}
+    vote_request = {'cmd': 'request_vote', 'key': key}
     response = broadcast(replicas, vote_request, epoch, 5)
     vote = response['cmd']
 
@@ -101,10 +101,11 @@ def setr(key, value, dest_host, dest_port_low, dest_port_high, timeout):
     if (length_of_bucket == 0):
         return "Cannot store value because no servers are available."
     else:
-        if (distributed_commit(replica_buckets, dest_host, dest_port_low, dest_port_high, 3)):
+        if (distributed_commit(replica_buckets, key, dest_host, dest_port_low, dest_port_high, 3)):
             broadcast(replica_buckets, {'cmd': 'setr', 'key': key, 'val': value, 'id': 0}, epoch, 5)
             return "Stored values in replica servers."
         else:
+            # broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)
             return "Cannot store value because one of the servers aborted."
 
 def getr(key, dest_host, dest_port_low, dest_port_high, timeout):

@@ -129,7 +129,7 @@ def update_DHT():
     else:
         replica_count = len(view)
 
-    print ("View: {}, Server_dict len: {}".format(view, len(server_dict)))
+    # print ("View: {}, Server_dict len: {}".format(view, len(server_dict)))
 
     # checks if dict is non-empty
     if (len(server_dict) != 0):
@@ -152,7 +152,7 @@ def update_DHT():
             # print ("Server Hash: {}".format(server_hash))
             server_dict[server_hash] = ((addr, port), server_id)
 
-    print ("Server Dict: {}".format(server_dict))
+    # print ("Server Dict: {}".format(server_dict))
 
 def add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order, server_dict, replica_buckets):
     i = 0
@@ -197,14 +197,14 @@ def bucket_allocator(key):
             # print ("Server Hash : {}".format(server_hash))
             # print ("Key Hash : {}".format(key_hash))
             # print ("Bucket Count : {}".format(bucket_count))
-            print ("Replica Count : {}".format(replica_count))
+            # print ("Replica Count : {}".format(replica_count))
             if (server_hash >= key_hash) and (bucket_count < replica_count):
                 print ("Found a suitable replica bucket...")
                 replica_buckets.append(value)
                 bucket_count += 1 
                 has_gtr_hash = True
-                print ("Value : {}".format(value))
-                print ("Last Dict Elem : {}".format(last_dict_elem))
+                # print ("Value : {}".format(value))
+                # print ("Last Dict Elem : {}".format(last_dict_elem))
                 if (value == last_dict_elem) and (bucket_count < replica_count):
                     replica_buckets = add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order, server_dict, replica_buckets)
 
