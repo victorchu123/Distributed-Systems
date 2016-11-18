@@ -49,7 +49,7 @@ def recv_msg(sock, exit):
     except AttributeError:
         print ("Cannot decode message.")
     except Exception as e:
-        print ("Couldn't receive message ({}): ".format(object_to_send), e)
+        print ("Couldn't receive message: ", e)
     if (sock is not None):
         sock.close()
     if (exit):

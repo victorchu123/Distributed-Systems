@@ -106,7 +106,7 @@ def setr(key, value, dest_host, dest_port_low, dest_port_high, timeout):
             broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)
             return "Stored values in replica servers."
         else:
-            # broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)
+            broadcast(replica_buckets, {'cmd': 'remove_commit', 'key': key, 'id': 0}, epoch, 5)
             return "Cannot store value because one of the servers aborted."
 
 def getr(key, dest_host, dest_port_low, dest_port_high, timeout):
