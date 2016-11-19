@@ -129,13 +129,20 @@ class ViewLeader():
         for server in view_servers_to_remove:
             view.remove(server)
             print ("Removing servers that have been replaced...")
-            self.rebalance(old_view, view, 'remove')
+            # self.rebalance(old_view, view, 'remove')
 
         return self.epoch
 
+    # Purpose & Behavior: Broadcasts rebalance RPC to all servers in new_view
+    # Input: server's unique id, server's src port, server's src ip, and the socket
+    # connects server to viewleader 
+    # Output: None
     def rebalance(self, old_view, new_view, epoch_op):
         for ((addr, port), server_id) in new_view:
-            server_sock = common_functions.create_connection(addr, port, port, None, True) 
+            try:
+                server_sock = common_functions.create_connection(addr, port, port, None, False) 
+            except Exception as e:
+                print ("Couldn't establish a connection with replica: ", e)
             common_functions.send_msg(server_sock, {'cmd': 'rebalance', 'old_view': old_view, 'new_view': new_view, 'op': epoch_op}, False)
             server_sock.close() 
 

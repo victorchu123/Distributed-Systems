@@ -76,8 +76,8 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
                 if (exit):
                     sys.exit()
                 else: 
-                    print ("Breaking from loop...")
-                    break
+                    raise Exception
+            continue
     return sock
 
 # Purpose & Behavior: Starts listening on the designated src port for a source host
@@ -92,7 +92,7 @@ def start_listening(src_port_low, src_port_max, timeout):
         try:
             bound_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             bound_socket.bind(('', src_port)) # binds socket to src port
-            bound_socket.listen(3) # socket starts listening for client
+            bound_socket.listen(4) # socket starts listening for client
             bound_socket.settimeout(timeout)
             break
         except Exception as e:

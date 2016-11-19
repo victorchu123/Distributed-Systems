@@ -5,6 +5,10 @@ bucket_count = 0
 HASH_MAX = 160
 view_to_use = []
 
+
+# Purpose & Behavior: Hashes given key with SHA1 algorithm
+# Input: key
+# Output: hash number
 def hash_key(d):
     d_encoded = d.encode('utf-8')
     sha1 = hashlib.sha1(d_encoded)
@@ -14,14 +18,19 @@ def hash_key(d):
     except ZeroDivisionError as e:
         print ("Cannot mod by 0: ", e)
 
+# Purpose & Behavior: Checks if given value is in the dictionary
+# Input: value, dictionary
+# Output: True/False
 def is_val_in_dict(dictionary, val):
     for key, value in dictionary.items():
         if (dictionary[key] == val):
             return True
     return False
 
+# Purpose & Behavior: Creates a distributed hash table in the form of {server_hash: ((addr, port), server_id)} for all replica servers
+# Input: None
+# Output: DHT
 def create_DHT():
-    # dict of (server_hash: ((addr, port), server_id)) for all replica servers
     server_dict = {}
 
     global replica_count
@@ -29,23 +38,6 @@ def create_DHT():
         replica_count = 3
     else:
         replica_count = len(view_to_use)
-
-    # print ("Replica Count : {}".format(replica_count))
-
-    # print ("View: {}, Server_dict len: {}".format(view_to_use, len(server_dict)))
-
-    # # checks if dict is non-empty
-    # if (len(server_dict) != 0):
-    #     # removes inactive servers from DHT and keeps track of servers in dict
-    #     server_hashes_to_remove = []
-
-    #     for server_hash, value in server_dict.items():
-    #         if (value not in view_to_use):
-    #             server_hashes_to_remove.append(server_hash)
-
-    #     for server_hash in server_hashes_to_remove:
-    #         print ("Removing inactive servers...")
-    #         del server_dict[server_hash]
         
     # adds active servers from view_to_use to DHT with new hashes
     for ((addr, port), server_id) in view_to_use:
@@ -58,6 +50,9 @@ def create_DHT():
     # print ("Server Dict: {}".format(server_dict))
     return server_dict
 
+# Purpose & Behavior: adds consecutive buckets (i.e. secondary and tertiary buckets) after the primary bucket has been determined
+# Input: bucket counter, replica counter, list of ordered server hashes, DHT, replica buckets list
+# Output: modified replica buckets list
 def add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order, server_dict, replica_buckets):
     i = 0
     while (bucket_count < replica_count):
@@ -68,6 +63,9 @@ def add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order,
         i += 1
     return replica_buckets
 
+# Purpose & Behavior: Determines proper replica buckets from the given key and view
+# Input: key and view
+# Output: final replica buckets list
 def bucket_allocator(key, view):
     global view_to_use
     view_to_use = view

@@ -30,7 +30,10 @@ class Server:
 
     def send_and_recv_heartbeat(self, src_port):
         # print ('Sending heartbeat msg to viewleader...')
-        sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+        try:
+            sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+        except Exception as e:
+            print ("Couldn't establish a connection with viewleader: ", e)
         common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port]}, False)
         recvd_msg = common_functions.recv_msg(sock, False)
         sock.close()
@@ -38,7 +41,10 @@ class Server:
         if (recvd_msg is not None):
             status = recvd_msg[0]
 
-        sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+        try:
+            sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+        except Exception as e:
+            print ("Couldn't establish a connection with viewleader: ", e)
         common_functions.send_msg(sock, {'cmd': 'update_view'}, False)
         curr_epoch = common_functions.recv_msg(sock, False)['Current Epoch']
 
@@ -84,6 +90,9 @@ class Server:
                         print ('Heartbeat rejected, will try again in 10 seconds...')
                 continue
 
+    # Purpose & Behavior: Computes a vote on whether to accept the distributed commit or not
+    # Input: viewleader's id for this server, viewleader's current epoch change value
+    # Output: string indiciating the vote value
     def vote(self, epoch, server_id):
         # print ("Comparing viewleader epoch ({}) to our epoch ({})...".format(epoch, self.epoch))
         # print ("Comparing viewleader server id ({}) to our server id ({})...".format(server_id, self.unique_id))
@@ -199,15 +208,20 @@ class Server:
             print ("Rejecting RPC request because function is unknown.")
         return response
 
+    # Purpose & Behavior: Separate thread from main thread that rebalances the server's bucket
+    # Input: new view, old view after epoch change, epoch change operation
+    # Output: None
     def rebalance(self, new_view, old_view, epoch_op):
         key_to_delete = ''
 
         global key_value_replica
         global data_in_view
 
-        
         for [[addr, port], server_id] in new_view:
-            sock = common_functions.create_connection(addr, port, port, 2, False)
+            try:
+                sock = common_functions.create_connection(addr, port, port, 5, False)
+            except Exception as e:
+                print ("Couldn't establish a connection with replica: ", e)
             common_functions.send_msg(sock, {'cmd': 'get_data'}, False)
             recvd_msg = common_functions.recv_msg(sock, False)
             if (recvd_msg is not None):
@@ -222,7 +236,10 @@ class Server:
             new_replicas = DHT.bucket_allocator(key, new_view)
 
             for [[addr, port], server_id] in new_replicas:
-                sock = common_functions.create_connection(addr, port, port, 5, False)
+                try:
+                    sock = common_functions.create_connection(addr, port, port, 5, False)
+                except Exception as e:
+                    print ("Couldn't establish a connection with replica: ", e)
                 common_functions.send_msg(sock, {'cmd': 'get_data', 'key': key}, False)
                 recvd_msg = common_functions.recv_msg(sock, False)
                 if (recvd_msg is not None) or (recvd_msg != ''):
@@ -230,7 +247,7 @@ class Server:
                 sock.close()
 
             with self.lock:
-                print (key_value_replica)
+                # print (key_value_replica)
                 try:
                     new_key, new_value = key_value_replica
                     if (new_key not in self.bucket):
@@ -257,13 +274,10 @@ class Server:
                 except Exception as e:
                     print ("No key_value found: ", e)
 
-        
-
     def start(self):
         bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
         self.accept_and_handle_messages(bound_socket, src_port)
         sock.close() # closes connection with server
-
 
 if __name__ == '__main__':
     server = Server()
