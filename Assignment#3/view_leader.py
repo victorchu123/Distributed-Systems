@@ -135,7 +135,7 @@ class ViewLeader():
 
     def rebalance(self, old_view, new_view, epoch_op):
         for ((addr, port), server_id) in new_view:
-            server_sock = common_functions.create_connection(addr, port, port, None, False) 
+            server_sock = common_functions.create_connection(addr, port, port, None, True) 
             common_functions.send_msg(server_sock, {'cmd': 'rebalance', 'old_view': old_view, 'new_view': new_view, 'op': epoch_op}, False)
             server_sock.close() 
 

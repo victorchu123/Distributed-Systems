@@ -46,9 +46,6 @@ def broadcast(replicas, object_to_send, epoch, timeout):
             if (rpc_command == 'request_vote'):
                 abort = True
                 return {'cmd': 'abort'}
-        except Exception as e:
-            print ("Couldn't connect to current replica server...will continue on remaining replicas: ", e)
-            continue 
     if (rpc_command == 'request_vote'):
         return {'cmd': 'commit'}
     if (response_key is not None):
@@ -57,12 +54,9 @@ def broadcast(replicas, object_to_send, epoch, timeout):
         return response_key
 
 def distributed_commit(replicas, key, dest_host, dest_port_low, dest_port_high, timeout):
-    try:
-        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-        active_servers, epoch = get_viewleader_info(viewleader_sock)
-    except Exception as e:
-        print ("Couldn't establish a connection with viewleader: ", e)
-        
+    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+    active_servers, epoch = get_viewleader_info(viewleader_sock)
+
     viewleader_sock.close()
 
     votes_received = 0
@@ -81,19 +75,14 @@ def distributed_commit(replicas, key, dest_host, dest_port_low, dest_port_high, 
         return True
 
 def setr(key, value, dest_host, dest_port_low, dest_port_high, timeout):
-    try:
-        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-        active_servers, epoch = get_viewleader_info(viewleader_sock)
-    except Exception as e:
-        print ("Couldn't establish a connection with viewleader: ", e)
+    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+    active_servers, epoch = get_viewleader_info(viewleader_sock)
+
     viewleader_sock.close()
 
-    try:
-        viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
-        replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key, 'val': value})
-        print ("Replicas : {}".format(replica_buckets))
-    except Exception as e:
-        print ("Couldn't establish a connection with viewleader: ", e)
+    viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True)
+    replica_buckets = get_replica_buckets(viewleader_sock, {'cmd': 'get_buckets', 'key': key, 'val': value})
+    print ("Replicas : {}".format(replica_buckets))
 
     viewleader_sock.close()
     length_of_bucket = len(replica_buckets)
