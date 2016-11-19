@@ -1,7 +1,8 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
 import socket, server_rpc, sys, common_functions, uuid, argparse, time, threading, DHT
 
-keys_in_replicas = []
+key_value_replica = ''
+data_in_view = {}
 
 class Server:
 
@@ -61,14 +62,14 @@ class Server:
             try:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
-                    print ("Accepting connection from host " + addr)
+                    # print ("Accepting connection from host " + addr)
                     recvd_msg = common_functions.recv_msg(sock, False)
                     response = self.process_msg_from_client(recvd_msg)
                     common_functions.send_msg(sock, response, False)
-                    print ("Finished sending message ({}) from server to dest...".format(response))
+                    # print ("Finished sending message ({}) from server to dest...".format(response))
 
                     if (time.time() - self.last_heartbeat_time >= 10.0):
-                        print ("Sending RPC Message and a RPC heartbeat...")
+                        # print ("Sending RPC Message and a RPC heartbeat...")
                         try:
                             self.last_heartbeat_time = time.time()
                             self.send_and_recv_heartbeat(src_port)
@@ -161,7 +162,10 @@ class Server:
                 response = 'abort'
             print ("Sending vote back to client...")
         elif (function_from_cmd == "remove_commit"):
-            key = recvd_msg["key"]
+            try:
+                key = recvd_msg["key"]
+            except LookupError:
+                print ("No such key.")
             # print ("Keys in in_commit_phase: {}".format(self.in_commit_phase))
             # print ("Key: {}".format(key))
             try:
@@ -170,20 +174,27 @@ class Server:
                 print ("Key is not currently being committed.")
             response = {'status': 'success', 'id': unique_id}
         elif (function_from_cmd == "get_data"):
-            key = recvd_msg["key"]
-            try: 
-                response = (key, self.bucket[key])
-            except LookupError as e:
-                response = None
-                print ("Couldn't find the key...")
+            try:
+                key = recvd_msg["key"]
+                try: 
+                    response = (key, self.bucket[key])
+                except LookupError as e:
+                    response = ''
+            except LookupError:
+                response = self.bucket
+                # print ("Couldn't find the key...")
         elif (function_from_cmd == "rebalance"):
             epoch_op = recvd_msg['op']
             new_view = recvd_msg['new_view']
             old_view = recvd_msg['old_view']
 
+            for key, value in self.bucket.items():
+                old_replicas = DHT.bucket_allocator(key, old_view)
+                new_replicas = DHT.bucket_allocator(key, new_view)
+
             thread = threading.Thread(target = self.rebalance, args = (new_view, old_view, epoch_op))
             thread.start()
-            response = None
+            response = ''
         else:
             print ("Rejecting RPC request because function is unknown.")
         return response
@@ -191,54 +202,62 @@ class Server:
     def rebalance(self, new_view, old_view, epoch_op):
         key_to_delete = ''
 
-        for key, value in self.bucket.items():
+        global key_value_replica
+        global data_in_view
+
+        with self.lock:
+            for [[addr, port], server_id] in new_view:
+                    sock = common_functions.create_connection(addr, port, port, 2, False)
+                    common_functions.send_msg(sock, {'cmd': 'get_data'}, False)
+                    recvd_msg = common_functions.recv_msg(sock, False)
+                    if (recvd_msg is not None):
+                        for key, value in recvd_msg.items():
+                            if (key not in data_in_view):
+                                data_in_view[key] = value
+                    sock.close()
+
+
+
+        for key, value in data_in_view.items():
             old_replicas = DHT.bucket_allocator(key, old_view)
             new_replicas = DHT.bucket_allocator(key, new_view)
 
-            for ((addr, port), server_id) in new_replicas:
-                sock = common_functions.create_connection(addr, port, port, 1, False)
-                common_functions.send_msg(sock, {'cmd': 'get_data', 'key': key}, False)
-                recvd_msg = common_functions.recv_msg(sock, False)
-                if (recvd_msg is not None):
-                    key_value_replica = recvd_msg
-                sock.close()
+            with self.lock:
+                for [[addr, port], server_id] in new_replicas:
+                    sock = common_functions.create_connection(addr, port, port, 5, False)
+                    common_functions.send_msg(sock, {'cmd': 'get_data', 'key': key}, False)
+                    recvd_msg = common_functions.recv_msg(sock, False)
+                    if (recvd_msg is not None) or (recvd_msg != ''):
+                        key_value_replica = recvd_msg
+                    sock.close()
 
-            key, value = key_value_replica
+            print (key_value_replica)
+            try:
+                key, value = key_value_replica
+            except Exception as e:
+                print ("No key_value found: ", e)
 
-            with self.lock: 
-                if (key not in self.bucket):
-                    try:
-                        self.bucket[key] = value
-                    except LookupError as e:
-                        print ("Couldn't set the key since there was no such key...")
-                    print ("Adding {}:{} to current replica...".format(new_key, new_value))
-                else:
-                    if (epoch_op == 'add'):
-                        if (old_view is not None):
-                            for ((addr, port), server_id) in old_view:
-                                if (self.unique_id == server_id) and (((addr, port), server_id) not in new_view):
-                                    print ("Deleting {}:{} on old replica...".format(key, value))
-                                    key_to_delete = key
-        with self.lock:
+            if (key not in self.bucket):
+                try:
+                    self.bucket[key] = value
+                    print ("Adding {}:{} to current replica...".format(key, value))
+                except LookupError as e:
+                    print ("Couldn't set the key since there was no such key...")
+            else:
+                if (epoch_op == 'add'):
+                    if (old_view is not None):
+                        # print ("Old view: {}".format(old_view))
+                        # print ("New view: {}".format(new_view))
+                        # print ("unique_id: {}".format(self.unique_id))
+                        for [[addr, port], server_id] in old_view:
+                            # print ("tuple: {}".format([[addr, port], server_id]))
+                            if (self.unique_id == server_id) and ([[addr, port], server_id] not in new_view):
+                                print ("Deleting {}:{} on old replica...".format(key, value))
+                                key_to_delete = key
             try:
                 del self.bucket[key_to_delete]
             except LookupError:
                 print ("Couldn't delete the key since there was no such key...")
-
-        # with lock:
-        #     for bucket in buckets_in_replicas:
-        #         for new_key, new_value in bucket.items():
-        #             if (new_key not in self.bucket):
-        #                 self.bucket[new_key] = new_value
-        #                 print ("Adding {}:{} to current replica...".format(new_key, new_value))
-        #             if (epoch_op == 'add'):
-        #                 if (old_view is not None):
-        #                     for ((addr, port), server_id) in old_view:
-        #                         if (self.unique_id == server_id) and (((addr, port), server_id) not in view):
-        #                             print ("Deleting {}:{} on old replica...".format(key, value))
-        #                             del self.bucket[new_key]
-
-
 
     def start(self):
         bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)

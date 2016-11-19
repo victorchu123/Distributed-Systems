@@ -82,7 +82,11 @@ class ViewLeader():
         # dict of all received heartbeats in the form of {'(server addr, server port): (last_timestamp, status, current_id)'}
         heartbeats = viewleader_rpc.heartbeats
         view = viewleader_rpc.view # list of all active servers
-        old_view = view
+
+        old_view = []
+
+        for entry in view:
+            old_view.append(entry)
 
         # print ("View: {}".format(view))
 
