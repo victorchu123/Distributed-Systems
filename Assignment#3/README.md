@@ -21,9 +21,6 @@ State:
 	-All features work except for rebalancing. I understood how to rebalance and created a design for it, but I was not able to fully implement it. I tried my best to get rebalancing to work, which does work when I have 3 or less servers open and I add another server in and it will rebalance. Whenever I have three or more servers open, I seem to run into situations where I get timeout and broken pipe errors. Moreover, when I shutdown some servers, I get a loop where it tries to keep connecting to failed servers even though I put exception handling for it (possibly deadlock). 
 	- In order to remove rebalancing, comment out lines 113 and 118 in view_leader.py.
 
-Additional thoughts:
-	-Very interesting assignment and it was very challenging. I wish I was able to finish rebalance though. Thank you for the extension on this!
-
 Design considerations:
 	-Bucket allocator algorithm:
 		It roughly distributed the keys among my buckets because it hashes each key and finds the smallest server hash value that is still greater or equal to it. Afterwards, it takes the consecutive buckets (number which depends on how many servers are in the view; either 0, 1, or 2), which may wrap around and take the first few buckets in the DHT. Since the hash function gives different values for each key and each server, it is roughly distributed. 
