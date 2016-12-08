@@ -8,8 +8,8 @@ class Server:
 
     def __init__(self):
         self.src_port = 38000
-        args = self.parse_cmd_arguments()
-        self.view_leader_ip = args.viewleader
+        self.args = self.parse_cmd_arguments()
+        self.view_leader_list = common_functions.sort_viewleaders(self.args.viewleader.split(","))
         self.unique_id = uuid.UUID(str(uuid.uuid4())).hex
         self.bucket = {}
         self.last_heartbeat_time = time.time()
@@ -17,54 +17,54 @@ class Server:
         self.in_commit_phase = []
         self.lock = threading.RLock()
         self.start()
+
+    def start(self):
+        bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
+        self.src_port = src_port
+        self.accept_and_handle_messages(bound_socket)
+        sock.close() # closes connection with server
         
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
-    # and their respective inputs. 
+    # and their respective inputs.
     # Input: None
     # Output: namespace of command line arguments
     def parse_cmd_arguments(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--viewleader', default='localhost')
+        parser.add_argument('--viewleader', default = common_functions.default_viewleader_ports(3, 39000, 39010))
         args = parser.parse_args()
         return args
 
-    def send_and_recv_heartbeat(self, src_port):
+    def send_and_recv_heartbeat(self):
         # print ('Sending heartbeat msg to viewleader...')
         try:
-            sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
+            sock = common_functions.contact_leader(self.view_leader_list)
+            common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), socket.gethostname(), self.src_port]}, False)
+            recvd_msg = common_functions.recv_msg(sock, False)
+            status = recvd_msg['status']
+            curr_epoch = recvd_msg['Current Epoch']
+
+            if (status == 'not ok'):
+                raise Exception
+            sock.close()
+
+            # print ("Updating our epoch to {}...".format(curr_epoch))
+            self.epoch = curr_epoch
         except Exception as e:
-            print ("Couldn't establish a connection with viewleader: ", e)
-        common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), src_port]}, False)
-        recvd_msg = common_functions.recv_msg(sock, False)
-        sock.close()
-
-        if (recvd_msg is not None):
-            status = recvd_msg[0]
-
-        try:
-            sock = common_functions.create_connection(self.view_leader_ip, 39000, 39010, 1, False)
-        except Exception as e:
-            print ("Couldn't establish a connection with viewleader: ", e)
-        common_functions.send_msg(sock, {'cmd': 'update_view'}, False)
-        curr_epoch = common_functions.recv_msg(sock, False)['Current Epoch']
-
-        # print ("Updating our epoch to {}...".format(curr_epoch))
-        self.epoch = curr_epoch
-        sock.close()
+            print ('Heartbeat rejected, will try again in 10 seconds...{}', e)
+        finally:
+            if (sock):
+                sock.close()
 
     # Purpose & Behavior: Starts accepting client connections and deals with receiving/responding to messages.
     # Input: Newly created object, and socket that is bound to port within the given range.
     # Output: None
-    def accept_and_handle_messages(self, bound_socket, src_port):
+    def accept_and_handle_messages(self, bound_socket):
         # Accept connections forever
         while True:
             # sends an heartbeat after 10 seconds, if socket doesn't timeout
             if (time.time() - self.last_heartbeat_time >= 10.0):
-                try:
-                    self.last_heartbeat_time = time.time()
-                    self.send_and_recv_heartbeat(src_port)
-                except Exception as e:
-                    print ('Heartbeat rejected, will try again in 10 seconds...')
+                self.last_heartbeat_time = time.time()
+                self.send_and_recv_heartbeat()
             try:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
@@ -76,18 +76,12 @@ class Server:
 
                     if (time.time() - self.last_heartbeat_time >= 10.0):
                         # print ("Sending RPC Message and a RPC heartbeat...")
-                        try:
-                            self.last_heartbeat_time = time.time()
-                            self.send_and_recv_heartbeat(src_port)
-                        except Exception as e:
-                            print ('RPC Heartbeat rejected...')
+                        self.last_heartbeat_time = time.time()
+                        self.send_and_recv_heartbeat()
             except socket.timeout:
                 if (time.time() - self.last_heartbeat_time >= 10.0):
-                    try:
-                        self.last_heartbeat_time = time.time()
-                        self.send_and_recv_heartbeat(src_port)
-                    except Exception as e:
-                        print ('Heartbeat rejected, will try again in 10 seconds...')
+                    self.last_heartbeat_time = time.time()
+                    self.send_and_recv_heartbeat()
                 continue
 
     # Purpose & Behavior: Computes a vote on whether to accept the distributed commit or not
@@ -218,10 +212,7 @@ class Server:
         global data_in_view
 
         for [[addr, port], server_id] in new_view:
-            try:
-                sock = common_functions.create_connection(addr, port, port, 5, False)
-            except Exception as e:
-                print ("Couldn't establish a connection with replica: ", e)
+            sock = common_functions.create_connection(addr, port, port, 5, False)
             common_functions.send_msg(sock, {'cmd': 'get_data'}, False)
             recvd_msg = common_functions.recv_msg(sock, False)
             if (recvd_msg is not None):
@@ -236,10 +227,7 @@ class Server:
             new_replicas = DHT.bucket_allocator(key, new_view)
 
             for [[addr, port], server_id] in new_replicas:
-                try:
-                    sock = common_functions.create_connection(addr, port, port, 5, False)
-                except Exception as e:
-                    print ("Couldn't establish a connection with replica: ", e)
+                sock = common_functions.create_connection(addr, port, port, 5, False)
                 common_functions.send_msg(sock, {'cmd': 'get_data', 'key': key}, False)
                 recvd_msg = common_functions.recv_msg(sock, False)
                 if (recvd_msg is not None) or (recvd_msg != ''):
@@ -273,11 +261,6 @@ class Server:
                         print ("Couldn't delete the key since there was no such key...")
                 except Exception as e:
                     print ("No key_value found: ", e)
-
-    def start(self):
-        bound_socket, src_port = common_functions.start_listening(self.src_port, 38010, 10)
-        self.accept_and_handle_messages(bound_socket, src_port)
-        sock.close() # closes connection with server
 
 if __name__ == '__main__':
     server = Server()

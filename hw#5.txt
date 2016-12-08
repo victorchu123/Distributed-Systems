@@ -1,0 +1,63 @@
+1. 	(a) hostname: ns1.google.com
+		ip: 216.239.3
+	(b) Assume Recursive Lookup.
+
+		1. Client C contacts a local name server L to resolve www.google.com
+		2. L doesn't have the record for www.google.com, but it has the record for the authoritative root name server in its zone, which it can contact to find the record
+		3. Authoritative root name server doesn't have the record for www.google.com, but it can contact com name server which is in its zone
+		4. com name server doesn't have the record for www.google.com, but it can contact google.com name server which is in its zone
+		5. google.com name server returns record with the hostname www.google.com and ip 66.102.7.10
+		6. com name server returns record with the hostname www.google.com and ip 66.102.7.10 and record with the hostname google.com and its corresponding record with google.com's authoritative name server, ns1.google.com with the ip 216.239.3
+			Moreover, the com name server caches the record with hostname www.google.com
+		7. Authoritative root name server returns records with the hostname www.google.com and ip 66.102.7.10 and record with the hostname com and its corresponding record with com's authoritative name server, a.gtld-servers.net with the ip 192.5.6.30 
+			The authoritative root name server also caches the record with the hostname google.com and its corresponding nameserver's record with the hostname ns1.google.com
+		8. The local name server L receives the record with the hostname www.google.com and returns the ip from that record, 66.102.7.10
+			It also stores the record with the hostname com and its name server, a.gtld-servers.net
+		9. Client C receives the ip 66.102.7.10 from L, which resolves www.google.com
+
+	(c) Assume Recursive Lookup.
+
+		1. Client C contacts a local name server L to resolve mail.google.com
+		2. L checks its cache and it doesn't have the record for mail.google.com, but it can contact com, which is in its cache
+		3. com checks its cache and it doesn't have the record for mail.google.com, but it can contact google.com's authoritative name server, which is in its records
+		4. google.com's authoritative name server, has the record for mail.google.com in its zone, so it returns that record with the ip 66.102.7.83
+		5. com updates its cache with the record for mail.google.com and returns the record for mail.google.com
+		6. The local name server L receives the record with the hostname mail.google.com and returns the ip in that record, 66.102.7.83
+		7. Client C receives the ip 66.102.7.83 from L, which resolves mail.google.com
+
+2. 
+	The cause of the problem is that the web address that you are trying to access has had changed some of their setttings. Whenever you try to access a website through your web browser, your web browser has to go through a process called DNS resolution because your browser needs to know which ip address to display responses from, which is not the same as the web address that you are used to.
+	
+	What probably happened is that the web address that you were trying to access had its ip address changed and since you visit this website all the time, then it was cached or saved in one of the authoritative name servers that are contacted within this DNS resolution process. Each time sometime is cached within an authoritative name server, it has a TTL or a time until the saved information is thrown away. In this case, the DNS resolution process would've incorrectly resolved your web address because it received the cached version of your web addresses IP, which is this case is outdated, and results in your inability to access your favorite website. In order for this issue to be resolved, the TTL of the cached version of your webpage must expire on the authoritative name server that it is on. After this happens, you can try to access the website again, and it will undergo the DNS resolution process again, except this time it will not used the cached version of the webpage, but rather the updated IP, resulting in a successful access of the webpage.
+
+3.	Possible outcomes:
+
+		Promise B
+		No Promise A
+		Accept B
+		No Accept A
+
+		Promise A
+		Promise B
+		Accept A
+		Accept B
+
+		(a) Acceptors receive a prepare message from Proposer B first because there is a network delay for Proposer A. They send a promise message to Proposer B. Shortly afterwards, they receive a prepare message from Proposer A, but they do not send a promise message to Proposer A because they have already seen the higher proposal number, 18, from Proposer B. In the second phase, Proposer B sends an accept message to the acceptors, but Proposer A does not. In this case, only Proposal B is accepted.
+		(b) Acceptors receive a prepare message from Proposer A first because there is a network delay for Proposer B. They send a promise message to Proposer A. Shortly afterwards, they receive a prepare message from Proposer B, but they send a promise message to Proposer B because Proposer B has a higher proposal number, 18, than the previously seen proposal number from Proposer A, 17. In the second phase, Proposer A and B send accept messages to the acceptors. In this case, both proposals are accepted.
+	
+
+4. 
+	(a) No, because the only write on x is 1, and yet P2 read R(x,0). It is not sequentially consistent because the second read, R(x,0), of P2 is supposed to come before the first read, R(x,1), in order to read a value of 0, since it was initialized as 0.
+	(b) Yes, order is P1: W(x,1); P3: R(x,1); P2: W(x,2); P3: R(x,2).
+	(c) No, the ordering from P3 conflict with P4. P3 reads x as 2 and then 1, while P4 reads x as 1 and then 2.
+	(d) Yes, order is P1: W(x,1); P3: R(x,1) or P4: R(x,1); P2: W(x,2); P3: R(x,2) or P4: R(x,2).
+	(e) No, the ordering of P3 violates sequential consistency because it read x as 2 and then 1, which conflicts with P4 since P4 reads 1 first and then 2 after.
+
+5.  Given: 
+		-Monotonic read
+	
+	(a) If we assume monotonic reads, the second in P2 cannot happen since it has to either read x as 1 or a more recent value. However, it is still causally consistent since it sees the write from P1 in the correct order.
+	(b) Yes, this is causally consistent because the potentially causal related events, i.e. the write from P1 and the write from P2, are seen in the same order for all processes (P3). 
+	(c) No, this is not causally consistent because the potentially causal related events, i.e. the writes from P1 and P2, are not seen in the same order for all processes (P3 and P4).
+	(d) Yes, this is causally consistent because the potentially causal related events, i.e. the writes from P1 and P2, are seen in the same order for all processes (P3 and P4).
+	(e) No, since P2: W(x,2) potentially relies on P1: W(x,1), and therefore P1: w(x,1) potentially causes P2: W(x,2), then the order that the processes see these events must be the same, which it is not as seen from P3 and P4.

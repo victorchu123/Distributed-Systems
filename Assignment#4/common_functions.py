@@ -48,6 +48,7 @@ def recv_msg(sock, exit):
         print("Connection dropped.")
     except AttributeError:
         print ("Cannot decode message.")
+        pass
     except Exception as e:
         print ("Couldn't receive message: ", e)
     if (sock is not None):
@@ -72,13 +73,18 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
             if (dest_port < dest_port_max):
                 dest_port += 1
             else:
-                print ("Cannot find an open port from {}-{}: ".format(dest_port_low, dest_port_max), e)
+                # print ("Cannot find an open port from {}-{}: ".format(dest_port_low, dest_port_max), e)
                 if (exit):
                     sys.exit()
                 else: 
-                    raise Exception
+                    # raise Exception
+                    break
             continue
-    return sock
+    try:
+        return sock
+    except Exception:
+        # print ("Socket couldn't be opened.")
+        pass
 
 # Purpose & Behavior: Starts listening on the designated src port for a source host
 # Input: source port lower bound & upper bound, timeout for socket
@@ -104,3 +110,28 @@ def start_listening(src_port_low, src_port_max, timeout):
             continue
     return (bound_socket, src_port)
 
+def default_viewleader_ports(n, VIEWLEADER_LOW, VIEWLEADER_HIGH):
+    hostname = socket.gethostname()
+    servers = ["%s:%s" % (hostname , port) for port in range (VIEWLEADER_LOW,
+        min (VIEWLEADER_HIGH, VIEWLEADER_LOW + n))]
+    return ",".join(servers)
+
+def contact_leader(view_leader_list):
+    view_leader_list.reverse()
+    for view_leader in view_leader_list:
+        (leader_hostname, leader_port) = view_leader
+        sock = create_connection(leader_hostname, leader_port, leader_port, 1, False)
+        try:
+            if (sock):
+                print ("Contacting viewleader : ({}, {})".format(leader_hostname, leader_port))
+                return sock
+        except Exception:
+            # print ("Socket couldn't be opened.")
+            pass
+
+def sort_viewleaders(viewleaders):
+    viewleader_tuples = []
+    for viewleader in viewleaders:
+        viewleader_tuples.append((viewleader.split(":")[0], viewleader.split(":")[1]))
+    viewleader_tuples.sort()
+    return viewleader_tuples

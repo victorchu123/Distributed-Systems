@@ -3,7 +3,7 @@ import hashlib, uuid
 replica_count = 0
 bucket_count = 0
 HASH_MAX = 160
-view_to_use = []
+view_to_use = {}
 
 
 # Purpose & Behavior: Hashes given key with SHA1 algorithm
@@ -40,7 +40,7 @@ def create_DHT():
         replica_count = len(view_to_use)
         
     # adds active servers from view_to_use to DHT with new hashes
-    for ((addr, port), server_id) in view_to_use:
+    for (addr, port, server_id), timestamp in view_to_use.items():
         if (len(server_dict) < replica_count): 
             # print ("Server ID: {}".format(server_id))
             server_hash = hash_key(server_id)

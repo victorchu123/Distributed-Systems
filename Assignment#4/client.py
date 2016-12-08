@@ -3,8 +3,10 @@ import socket, argparse, sys, common_functions, time, client_rpc
 
 class Client:
 
-    def __init__(self): 
-        self.start()
+    def __init__(self):
+        self.args = self.parse_cmd_arguments()
+        self.view_leader_list = common_functions.sort_viewleaders(self.args.viewleader.split(","))
+        self.start(self.args)
 
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
     # and their respective inputs. 
@@ -13,7 +15,7 @@ class Client:
     def parse_cmd_arguments(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('--server', default='localhost')
-        parser.add_argument('--viewleader', default='localhost')
+        parser.add_argument('--viewleader', default = common_functions.default_viewleader_ports(3, 39000, 39010))
 
         subparsers = parser.add_subparsers(dest='cmd')
 
@@ -71,9 +73,7 @@ class Client:
 
         return args_dict
 
-    def start(self):
-        args = self.parse_cmd_arguments()
-
+    def start(self, args):
         # if the optional argument "--server" is used, 
         # then set localhost as this computer's IP. else, return error and exit.
         if (args.server is not None):
@@ -86,12 +86,12 @@ class Client:
         self.timeout = 1
         # sets destination port ranges and destination hosts based on the RPC functions called
         if (args.cmd in viewleader_args):
-            self.dest_host = str(args.viewleader)
+            self.dest_host = self.view_leader_list
             self.dest_port_low = 39000
             self.dest_port_high = 39010
             self.dest_name = 'viewleader'
         elif (args.cmd == 'getr' or args.cmd == 'setr'):
-            self.dest_host = str(args.viewleader)
+            self.dest_host = self.view_leader_list
             self.dest_port_low = 39000
             self.dest_port_high = 39010
             self.dest_name = 'viewleader_and_server'
@@ -113,18 +113,28 @@ class Client:
             else: 
                 print (client_rpc.setr(args.key, args.val, self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout))
         while (stop == False):
-            sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
-            # sends encoded message length and message to server/viewleader; if can't throw's an error
-            common_functions.send_msg(sock, args_dict, True)
-            recvd_msg = common_functions.recv_msg(sock, True)
-            if (recvd_msg == "{'status': 'retry'}"):
-                print (str(recvd_msg))
-                time.sleep(5) # delays for 5 seconds and then tries again
-            else: 
-                print (str(recvd_msg))
-                stop = True  
+            # print (self.dest_host)
+            # print (self.view_leader_list)
+            if (self.dest_host == self.view_leader_list):
+                sock = common_functions.contact_leader(self.view_leader_list)
+            else:
+                sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
+
+            if (sock):
+                # sends encoded message length and message to server/viewleader; if can't throw's an error
+                common_functions.send_msg(sock, args_dict, True)
+                recvd_msg = common_functions.recv_msg(sock, True)
+                if (recvd_msg == "{'status': 'retry'}"):
+                    print (str(recvd_msg))
+                    time.sleep(5) # delays for 5 seconds and then tries again
+                else: 
+                    print (str(recvd_msg))
+                    stop = True
+            else:
+                print ("Couldn't establish a connection.")
+                stop = True
             
-        if (sock is not None):
+        if (sock):
             sock.close()
         sys.exit()
 
