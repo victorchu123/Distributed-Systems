@@ -1,8 +1,8 @@
 import socket, json, struct, sys
 
 # Purpose & Behavior: Encodes a message and then sends it to the defined socket.
-# Input: Newly created object, and socket where TCP connection is created and the object that we
-# want to send over.
+# Input: Newly created object, socket where TCP connection is created and the object that we
+# want to send over, and boolean deciding whether to exit out of program
 # Output: None
 def send_msg(sock, object_to_send, exit):
     # sends encoded message length and message to destination; if can't throw's an error
@@ -24,7 +24,7 @@ def send_msg(sock, object_to_send, exit):
             sys.exit()
 
 # Purpose & Behavior: Receives a message from the sender socket and decodes it. 
-# Input: Newly created object, and socket where TCP connection is created.
+# Input: Newly created object, socket where TCP connection is created, and boolean deciding whether to exit out of program
 # Output: received message that is a decoded object
 def recv_msg(sock, exit):
     # receives decoded message length and message from source; if can't throw's an error
@@ -110,14 +110,19 @@ def start_listening(src_port_low, src_port_max, timeout):
             continue
     return (bound_socket, src_port)
 
+# Purpose & Behavior: Computes default viewleader list
+# Input: number of viewleaders, viewleader port range
+# Output: list of viewleaders
 def default_viewleader_ports(n, VIEWLEADER_LOW, VIEWLEADER_HIGH):
-    hostname = socket.gethostname()
+    hostname = socket.gethostname() # gets default hostname
     servers = ["%s:%s" % (hostname , port) for port in range (VIEWLEADER_LOW,
         min (VIEWLEADER_HIGH, VIEWLEADER_LOW + n))]
     return ",".join(servers)
 
+# Purpose & Behavior: Uses bully algorithm to choose a leader (chooses the viewleader who is sorted the highest)
+# Input: view leader list to contact (sorted in descending order); has the form [(hostname, port)]
+# Output: socket where the connection is established
 def contact_leader(view_leader_list):
-    view_leader_list.reverse()
     for view_leader in view_leader_list:
         (leader_hostname, leader_port) = view_leader
         sock = create_connection(leader_hostname, leader_port, leader_port, 1, False)
@@ -125,10 +130,14 @@ def contact_leader(view_leader_list):
             if (sock):
                 print ("Contacting viewleader : ({}, {})".format(leader_hostname, leader_port))
                 return sock
+                break
         except Exception:
             # print ("Socket couldn't be opened.")
             pass
 
+# Purpose & Behavior: Sorts viewleaders in ascending order
+# Input: viewleaders list; has the form [(host:port)]
+# Output: sorted viewleader list in ascending order of the form [(hostname, port)]
 def sort_viewleaders(viewleaders):
     viewleader_tuples = []
     for viewleader in viewleaders:

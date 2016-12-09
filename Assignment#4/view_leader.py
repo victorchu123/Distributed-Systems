@@ -8,10 +8,10 @@ class ViewLeader():
         self.port = 39000
         self.hostname = socket.gethostname()
         self.args = self.parse_cmd_arguments()
-        self.view_leader_list = self.sort_viewleaders(self.args.viewleader.split(","))
+        self.view_leader_list = common_functions.sort_viewleaders(self.args.viewleader.split(","))
         self.leader = self.view_leader_list[len(self.view_leader_list)-1]
         self.log = []
-        global last_seen_proposal_num
+        global last_seen_proposal_num # highest last seen proposal number
         last_seen_proposal_num = 0
         self.start()
 
@@ -25,20 +25,12 @@ class ViewLeader():
         args = parser.parse_args()
         return args
 
-    def sort_viewleaders(self, viewleaders):
-        viewleader_tuples = []
-        for viewleader in viewleaders:
-            viewleader_tuples.append((viewleader.split(":")[0], viewleader.split(":")[1]))
-        viewleader_tuples.sort()
-        return viewleader_tuples
-
     def start(self):
         sock, src_port = common_functions.start_listening(self.port, 39010, 1) # tries to listen from port 39000-39010 with 1 sec timeout
-        self.port = src_port
+        self.port = src_port # updates self.port to the port that this viewleader has established a connection on
 
+        # checks to see if the viewleader's addr:port is in the specified view_leader_list (the allowed viewleaders)
         if ((self.hostname, str(self.port)) not in self.view_leader_list):
-            # print ((self.hostname, self.port))
-            # print(self.view_leader_list)
             print ("Viewleader's endpoint is not in viewleader list.")
             sock.close()
             sys.exit()
@@ -52,15 +44,14 @@ class ViewLeader():
         # Accept connections forever
         while True:
             try:
+                self.update_view()
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
-                    self.leader = (self.hostname, self.port)
+                    self.leader = (self.hostname, self.port) # sets the leader equal to the viewleader that the client/server contacts
                     recvd_msg = common_functions.recv_msg(sock, False) # receives message from client/server
                     self.process_msg(recvd_msg, addr, sock)
             except socket.timeout:
                 continue
-            finally:
-                self.update_view()
 
     # Purpose & Behavior: Processes commands from the received message and calls upon the 
     # appropriate functions in order to generate a response to the client.
@@ -74,12 +65,21 @@ class ViewLeader():
         elif (function_from_cmd == 'heartbeat'):
             new_id = recvd_msg["args"][0]
             src_addr = recvd_msg["args"][1]
-            src_port = recvd_msg["args"][2] # src port
+            src_port = recvd_msg["args"][2]
             timestamp = time.time()
             args = [new_id, src_addr, src_port, timestamp]
+
+            # Runs consensus algorithm which checks to see if there is a quorum between viewleaders 
+            # before applying the given command.
             if (self.run_consensus_alg(sock, function_from_cmd, args)):
+                # leader applies given command and updates view
+                is_accepted = viewleader_rpc.heartbeat(new_id, src_port, src_addr, sock, timestamp)
+                if (not(is_accepted)):
+                    timestamp = 0
+
+                # adds the applied command to log; rejected heartbeats have timestamp = 0 and accepted ones have their inital
+                # received timestamp
                 self.log.append({'cmd': 'heartbeat', 'id': new_id, 'addr': src_addr, 'port': src_port, 'timestamp': timestamp}.copy())
-                viewleader_rpc.heartbeat(new_id, src_port, src_addr, sock, timestamp)
                 self.update_view()
                 curr_epoch = viewleader_rpc.query_servers(self.log)['Current epoch']
                 common_functions.send_msg(sock, {'status': 'ok', 'Current Epoch': curr_epoch}, False)
@@ -90,11 +90,13 @@ class ViewLeader():
             lock_name = recvd_msg["lock_name"]
             requester_id = recvd_msg["requester_id"]
             args = [lock_name, requester_id]
+
             print ("Running consensus algorithm...")
             if (self.run_consensus_alg(sock, function_from_cmd, args)):    
                 self.log.append({'cmd': 'lock_get', 'lock': lock_name, 'requester': requester_id}.copy())
                 is_got = viewleader_rpc.lock_get(lock_name, requester_id)
 
+                # leader adds the applied command to log if the lock was successfully obtained
                 if (is_got):
                     common_functions.send_msg(sock, {'status': 'granted'}, False)
                 else:
@@ -106,10 +108,13 @@ class ViewLeader():
             lock_name = recvd_msg["lock_name"]
             requester_id = recvd_msg["requester_id"]
             args = [lock_name, requester_id]
+
+            print ("Running consensus algorithm...")
             if (self.run_consensus_alg(sock, function_from_cmd, args)):
                 self.log.append({'cmd': 'lock_release', 'lock': lock_name, 'requester': requester_id}.copy())
                 is_released = viewleader_rpc.lock_release(lock_name, requester_id)
 
+                # leader adds the applied command to log if the the lock was successfully released
                 if (is_released):
                     common_functions.send_msg(sock, {'status': 'ok'}, False)
                 else:
@@ -120,14 +125,29 @@ class ViewLeader():
             msg = recvd_msg['msg']
             print (msg)
         elif (function_from_cmd == 'prepare'):
+            # replica sees the prepare message from the leader
             proposal_num = recvd_msg['proposal_num']
             length_of_log = len(self.log)
 
-            # promise message Phase 1
+            # sets the last seen proposal number equal to the 
+            # received proposal number if it is greater than
+            # the last value that it held.
             global last_seen_proposal_num
             if (last_seen_proposal_num < proposal_num):
                 last_seen_proposal_num = proposal_num
 
+            # Promise message Phase 1:
+            # Determines whether to send a promise message back to 
+            # the leader or not. 
+            # 
+            # Cases:
+            # 1. If the received proposal number is equal to the length of the current log, then 
+            # it does. 
+            # 2. If the proposal num is less than the length of the current log, then this replica
+            # send a promise message with the missing logs that the leader is missing, back to the leader so it can update itself.
+            # 3. If the proposal num is greater, then it sends a promise message back to the leader with the num of logs that it needs from the leader
+            # to update itself.
+            
             if (proposal_num == length_of_log):
                 common_functions.send_msg(sock, {'status': 'ok', 'addr': self.hostname, 'port': self.port}, False)
             elif (proposal_num < length_of_log):
@@ -137,16 +157,18 @@ class ViewLeader():
                 common_functions.send_msg(sock, {'status': 'ok', 'num_logs_replica_needs': proposal_num - length_of_log, 'addr': self.hostname, 'port': self.port}, False)
         
         elif (function_from_cmd == 'accept'):
-            # print ("Proposal: {}".format(recvd_msg))
+            # replica sees the accept message from the leader
             new_proposal_num = recvd_msg['new_proposal_num']
             new_cmd = recvd_msg['new_cmd']
             args = recvd_msg['args']
 
             try:
                 logs_for_replica = recvd_msg['logs_replica_needs']
+                # determines if the replica can accept this accept message; it can if it has
+                # not seen a higher proposal number since it last sent a promise message to this proposer/leader.
+                # i.e. the new proposal num is greater or equal to the last seen proposal number.
                 if (last_seen_proposal_num <= new_proposal_num):
-                    # print ("Log before update: {}".format(self.log))
-                    print ("Replaying logs on this replica...")
+                    # replays the logs received from leader to catch back up
                     self.replay(logs_for_replica)
                     if (len(self.log) != 0):
                         print ("Updated log: {}".format(self.log))
@@ -154,6 +176,7 @@ class ViewLeader():
             except Exception:
                 print ("No logs missing.")
 
+            # replica applies the given command to its log and updates view
             if (new_cmd == 'heartbeat'):
                 new_id = args[0]
                 src_addr = args[1]
@@ -164,8 +187,10 @@ class ViewLeader():
                 requester_id = args[1]
 
             if (new_cmd == 'heartbeat'):
+                is_accepted = viewleader_rpc.heartbeat(new_id, src_port, src_addr, sock, timestamp)
+                if (not(is_accepted)):
+                    timestamp = 0
                 self.log.append({'cmd': 'heartbeat', 'id': new_id, 'addr': src_addr, 'port': src_port, 'timestamp': timestamp}.copy())
-                viewleader_rpc.heartbeat(new_id, src_port, src_addr, sock, timestamp)
                 self.update_view()
             elif (new_cmd == 'lock_get'):
                 self.log.append({'cmd': 'lock_get', 'lock': lock_name, 'requester': requester_id}.copy())
@@ -184,10 +209,14 @@ class ViewLeader():
                     common_functions.send_msg(sock, {'status': 'ok'}, False)
                 else:
                     common_functions.send_msg(sock, {'status': 'not ok'}, False)
-            # print ("Updated log: {}".format(self.log))
         else:
             print ("Rejecting RPC request because function is unknown.")
 
+
+    # Purpose & Behavior: Broadcasts message to all replicas in list except the caller itself,
+    # and collects a list of responses
+    # Input: message to broadcast, replicas that receive the broadcast
+    # Output: list of responses from replicas
     def broadcast(self, msg, replicas):
         responses = []
         leader_hostname = self.leader[0]
@@ -195,7 +224,8 @@ class ViewLeader():
 
         for replica in replicas:
             addr, port = replica
-            # print ((addr, port), (leader_hostname, leader_port))
+            # checks to see if the replica has the same addr/port as the leader; if so,
+            # don't broadcast to it
             if ((addr, port) != (leader_hostname, leader_port)):
                 sock = common_functions.create_connection(addr, port, port, 1, False)
                 if (sock):
@@ -206,7 +236,11 @@ class ViewLeader():
                     sock.close()
         return responses
 
+    # Purpose & Behavior: Replays the given logs on the current viewleader; and updates view
+    # Input: list of logs that the leader is missing
+    # Output: None
     def replay(self, logs_leader_is_missing):
+        print ("Replaying logs on this replica...")
         for logs in logs_leader_is_missing:
             cmd = logs['cmd']
             if (cmd == 'lock_get'):
@@ -228,12 +262,17 @@ class ViewLeader():
                 addr = logs['addr']
                 port = logs['port']
                 timestamp = logs['timestamp']
-                # print ('Replaying heartbeat... with args: {}'.format([server_id, addr, port, timestamp]))
                 is_accepted = viewleader_rpc.heartbeat(server_id, port, addr, None, timestamp)
-                if (is_accepted):
-                    print ("Appending cmd to log...")
-                    self.log.append({'cmd': 'heartbeat', 'id': server_id, 'addr': addr, 'port': port, 'timestamp': timestamp}.copy())
+                if (not(is_accepted)):
+                    timestamp = 0
+                print ("Appending cmd to log...")
+                self.log.append({'cmd': 'heartbeat', 'id': server_id, 'addr': addr, 'port': port, 'timestamp': timestamp}.copy())
+        self.update_view()
+        print ("Updated log: {}".format(self.log))
 
+    # Purpose & Behavior: Find the max of logs lengths from the list of logs provided 
+    # Input: list of 'logs'
+    # Output: max of logs lengths
     def find_max(self, logs_missing):
         if (len(logs_missing) == 0):
             return None
@@ -242,14 +281,19 @@ class ViewLeader():
         else:
             return max(len(logs_missing[0]), self.find_max(logs_missing[1:]))
     
+    # Purpose & Behavior: Find the log with the max length calculated from find_max
+    # Input: list of 'logs'
+    # Output: log with the max length
     def find_max_log(self, logs_missing):
         max_len = self.find_max(logs_missing)
         for logs in logs_missing:
             if len(logs) == max_len:
                 return logs
 
+    # Purpose & Behavior: Checks to see if there is a quorum amongst replicas based on their responses
+    # Input: list of responses from replicas
+    # Output: True/False (indicating whether there is a quorum or not)
     def has_quorum(self, responses):
-        # print ("Responses: {}".format(responses))
         num_replicas_agreed = 1 # initialize with the leader's self, which obviously agrees with itself
         logs_leader_is_missing = []
 
@@ -261,23 +305,25 @@ class ViewLeader():
                 if (response['logs_leader_is_missing']):
                     logs_leader_is_missing.append(response['logs_leader_is_missing'])
             except Exception:
-                # print ("No logs missing from current replica.")
                 pass
 
         log_to_replay = self.find_max_log(logs_leader_is_missing)
         if (log_to_replay):
-            self.replay(log_to_replay)
+            self.replay(log_to_replay) # replays missing logs
             if (len(self.log)!= 0):
-                # print ("Updated log: {}".format(self.log))
-                pass
+                print ("Updated log: {}".format(self.log)) # prints update log
 
-        # print ("num_replicas_agreed: {}, Quorum requirement: {}".format(num_replicas_agreed, round(len(self.view_leader_list)/2)))
+        # checks to see if we have responses from more than half the replicas for a quorum
         if (num_replicas_agreed >= round(len(self.view_leader_list)/2)):
             return True
         else:
             print ("Quorum has not been met, aborting command.")
             return False # quorum of replicas hasn't been reached
 
+    # Purpose & Behavior: Runs a Consensus algorithm which determines if there is a quorum
+    # and also relays logs to the replicas that need logs
+    # Input: socket, requested command, list of arguments for the command
+    # Output: True/False (determines if there is a consensus, so the given command can be applied)
     def run_consensus_alg(self, sock, cmd, args):
         proposal_num = len(self.log) # proposal number is equivalent to length of log
         msg = {'cmd': 'prepare', 'proposal_num': proposal_num} # prepare message; Phase 1
@@ -299,19 +345,18 @@ class ViewLeader():
                     else:
                         status = 'reject'
                 except Exception:
-                    # print("Invalid response.")
                     continue
                 try:
                     num_logs_replica_needs = response['num_logs_replica_needs']
                 except Exception:
-                    # print ("No logs need to be sent to this replica.")
                     pass
                 try: 
                     logs_leader_is_missing = response['logs_leader_is_missing']
                 except Exception:
-                    # print ("No logs need to be received from this replica.")
                     pass
 
+                # if there are logs that the replicas need, sends it to them. Also
+                # sends updated proposal numbers and the requested command
                 if (num_logs_replica_needs):
                     print ("num_logs_replica_needs: {}".format(num_logs_replica_needs))
                     logs_to_replay = self.log[len(self.log) - num_logs_replica_needs:]
@@ -332,7 +377,6 @@ class ViewLeader():
         else:
             return False
 
-
     # Purpose & Behavior: Updates the view 
     # Input: None
     # Output: None
@@ -343,20 +387,30 @@ class ViewLeader():
         heartbeats = viewleader_rpc.heartbeats
         view = viewleader_rpc.view # dict of all active servers
 
-        old_view = view.copy()
+        old_view = view.copy() # creates a copy of the view
 
         # adds server to a list if they haven't responded in more than 30 seconds
         for (addr,port), (last_timestamp, status, server_id) in heartbeats.items():
-            if (time.time() - last_timestamp > 30.0) and (status == 'working'):
+            if (time.time() - last_timestamp > 30.0) and (status == 'working') and ((addr, port, server_id) not in viewleader_rpc.failed_servers):
                 print ("It has been more than 30 seconds since last heartbeat, marking server as failed.")
                 failed_servers.append((addr,port))
+                viewleader_rpc.failed_servers.append((addr, port, server_id)) # adds server to failed_servers list stored in viewleader_rpc.py
+
+        # adds the failed heartbeats in the log to the failed servers list, so they are not included in the view
+        for log in self.log:
+            cmd = log['cmd']
+            if (cmd == 'heartbeat'):
+                timestamp = log['timestamp']
+                addr = log['addr']
+                port = log['port']
+                server_id = log['id']
+                if (timestamp == 0) and ((addr, port, server_id) not in viewleader_rpc.failed_servers):
+                    viewleader_rpc.failed_servers.append((addr, port, server_id))
 
         # marks crashed/failed servers as failed
         for server in failed_servers:
             last_timestamp, status, current_id = heartbeats[server]
             heartbeats[server] = (last_timestamp, 'failed', current_id) 
-
-        # print ("Heartbeats: {}".format(heartbeats))   
 
         # adds working servers to view and removes failing servers
         for (addr,port), (new_timestamp, status, server_id) in heartbeats.items():
@@ -376,22 +430,6 @@ class ViewLeader():
                     pass
                 # send rebalance RPC request to server
                 # self.rebalance(old_view, view, 'remove')
-
-        view_servers_to_remove = []
-        for (view_addr, view_port, view_server_id), view_last_timestamp in view.items():
-            for (heart_addr, heart_port), (heart_last_timestamp, status, heart_server_id) in heartbeats.items():
-                if ((view_addr, view_port) == (heart_addr, heart_port)) and (heart_server_id != view_server_id):
-                    view_servers_to_remove.append((view_addr, view_port, view_server_id))
-
-        # print ("view_servers_to_remove: {}".format(view_servers_to_remove))  
-
-        for server in view_servers_to_remove:
-            try:
-                del view[server]
-            except Exception:
-                pass
-            print ("Removing servers that have been replaced...")
-            # self.rebalance(old_view, view, 'remove')
 
     # Purpose & Behavior: Broadcasts rebalance RPC to all servers in new_view
     # Input: server's unique id, server's src port, server's src ip, and the socket

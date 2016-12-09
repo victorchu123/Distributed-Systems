@@ -1,6 +1,8 @@
 import client, common_functions, socket, DHT
 
-
+# Purpose & Behavior: Gets replica buckets that will become server replicas
+# Input: destination host, destination port range, timeout, key that we want to get replica buckets for
+# Output: replica buckets list
 def get_replica_buckets(dest_host, dest_port_low, dest_port_high, timeout, key):
     viewleader_sock = common_functions.create_connection(dest_host, dest_port_low, dest_port_high, timeout, True) 
     view, epoch = get_viewleader_info(viewleader_sock)

@@ -4,15 +4,12 @@ from collections import deque
 heartbeats = {} # dict of all received heartbeats in the form of {'(server addr, server port): (last_timestamp, status, current_id)'}
 view = {} # dict of all active servers in the form of '(addr, port, server_id)' : last_timestamp
 locks_held = {} # lock table in the form of 'lock_name': (waiter_queue, owner)
-
+failed_servers = [] # list of all failed servers in this viewleader; has the form of [(addr, port, server_id)]
 
 # Purpose & Behavior: Returns current view and epoch
 # Input: current log from viewleader
 # Output: dictionary of list of active servers and the current epoch
 def query_servers(log):
-    # print ("Log: {}".format(log))
-    # print ("View: {}".format(view))
-    # print ("Heartbeats: {}".format(heartbeats))
     info = []
     epoch = 0
     for (addr, port, server_id), last_timestamp in view.items():
@@ -20,6 +17,11 @@ def query_servers(log):
 
     heartbeat_dict = {}
 
+    # recalculates epoch based on entries in log; if the timestamp is 0, 
+    # then I designated it to be a rejected heartbeat, and if otherwise,
+    # it is an accepted heartbeat. In this case, if the heartbeat has 
+    # a greater value than the timestamp in the dict, then it will be 
+    # updated.
     for entry in log:
         cmd = entry['cmd']
         if cmd == 'heartbeat':
@@ -30,7 +32,8 @@ def query_servers(log):
                 if (last_timestamp < timestamp):
                     heartbeat_dict[server_id] = timestamp
             except:
-                heartbeat_dict[server_id] = timestamp
+                if (timestamp != 0):
+                    heartbeat_dict[server_id] = timestamp
 
     for server_id, timestamp in heartbeat_dict.items():
         if (time.time() - timestamp > 30.0):
@@ -106,7 +109,7 @@ def heartbeat(new_id, port, addr, sock, timestamp):
     if ((addr, port) in heartbeats):
         last_timestamp, status, current_id = heartbeats[(addr, port)]
         if (last_timestamp < timestamp):
-            if (new_id == current_id):      
+            if ((addr, port, new_id) not in failed_servers):      
                 if (status == 'working'): 
                     print ("Accepting heartbeat from host: " + addr + ":" + str(port))
                     heartbeats[(addr, port)] = heartbeats_value
@@ -115,9 +118,8 @@ def heartbeat(new_id, port, addr, sock, timestamp):
                     print ("Rejecting heartbeat from host: " + addr + ":" + str(port) + " because server failed.")
                     return False
             else:
-                print ("Accepting heartbeat from host: " + addr + ":" + str(port))
-                heartbeats[(addr, port)] = heartbeats_value
-                return True
+                print ("Rejecting heartbeat from host: " + addr + ":" + str(port) + " because server failed.")
+                return False
     else:
         print ("Accepting heartbeat from host: " + addr + ":" + str(port))
         heartbeats[(addr, port)] = heartbeats_value

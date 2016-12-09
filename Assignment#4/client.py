@@ -6,6 +6,7 @@ class Client:
     def __init__(self):
         self.args = self.parse_cmd_arguments()
         self.view_leader_list = common_functions.sort_viewleaders(self.args.viewleader.split(","))
+        self.view_leader_list.reverse()
         self.start(self.args)
 
     # Purpose & Behavior: Uses argparse to process command line arguments into functions 
@@ -113,10 +114,8 @@ class Client:
             else: 
                 print (client_rpc.setr(args.key, args.val, self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout))
         while (stop == False):
-            # print (self.dest_host)
-            # print (self.view_leader_list)
             if (self.dest_host == self.view_leader_list):
-                sock = common_functions.contact_leader(self.view_leader_list)
+                sock = common_functions.contact_leader(self.view_leader_list) # creates a connection with viewleader
             else:
                 sock = common_functions.create_connection(self.dest_host, self.dest_port_low, self.dest_port_high, self.timeout, True)
 

@@ -10,6 +10,7 @@ class Server:
         self.src_port = 38000
         self.args = self.parse_cmd_arguments()
         self.view_leader_list = common_functions.sort_viewleaders(self.args.viewleader.split(","))
+        self.view_leader_list.reverse()
         self.unique_id = uuid.UUID(str(uuid.uuid4())).hex
         self.bucket = {}
         self.last_heartbeat_time = time.time()
@@ -34,6 +35,11 @@ class Server:
         args = parser.parse_args()
         return args
 
+
+    # Purpose & Behavior: Sends a heartbeat to the viewleader and receives messages 
+    # that the viewleaders sends back; also updates epoch
+    # Input: None
+    # Output: None
     def send_and_recv_heartbeat(self):
         # print ('Sending heartbeat msg to viewleader...')
         try:
@@ -46,9 +52,7 @@ class Server:
             if (status == 'not ok'):
                 raise Exception
             sock.close()
-
-            # print ("Updating our epoch to {}...".format(curr_epoch))
-            self.epoch = curr_epoch
+            self.epoch = curr_epoch # updates epoch
         except Exception as e:
             print ('Heartbeat rejected, will try again in 10 seconds...{}', e)
         finally:
@@ -88,8 +92,6 @@ class Server:
     # Input: viewleader's id for this server, viewleader's current epoch change value
     # Output: string indiciating the vote value
     def vote(self, epoch, server_id):
-        # print ("Comparing viewleader epoch ({}) to our epoch ({})...".format(epoch, self.epoch))
-        # print ("Comparing viewleader server id ({}) to our server id ({})...".format(server_id, self.unique_id))
         if (epoch == self.epoch) and (server_id == self.unique_id):
             return 'commit'
         else:
@@ -133,7 +135,6 @@ class Server:
             else:
                 response = {'status': 'success', 'result': result, 'id': unique_id}
         elif (function_from_cmd == "get_id"):
-            # print ("Returning service_id to viewleader...".format(self.unique_id))
             response = str(self.unique_id)
         elif (function_from_cmd == "getr"):
             with self.lock:
@@ -156,7 +157,6 @@ class Server:
             key = recvd_msg["key"]
             if (key not in self.in_commit_phase): 
                 self.in_commit_phase.append(key)
-                # print ("Added key to in_commit_phase: {}".format(self.in_commit_phase))
                 viewleader_epoch = recvd_msg["epoch"]
                 server_id = uuid.UUID(recvd_msg["server_id"]).hex
                 response = self.vote(viewleader_epoch, server_id)
@@ -169,8 +169,6 @@ class Server:
                 key = recvd_msg["key"]
             except LookupError:
                 print ("No such key.")
-            # print ("Keys in in_commit_phase: {}".format(self.in_commit_phase))
-            # print ("Key: {}".format(key))
             try:
                 self.in_commit_phase.remove(key)
             except ValueError:
@@ -185,7 +183,6 @@ class Server:
                     response = ''
             except LookupError:
                 response = self.bucket
-                # print ("Couldn't find the key...")
         elif (function_from_cmd == "rebalance"):
             epoch_op = recvd_msg['op']
             new_view = recvd_msg['new_view']
