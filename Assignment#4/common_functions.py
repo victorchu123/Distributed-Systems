@@ -7,7 +7,6 @@ import socket, json, struct, sys
 def send_msg(sock, object_to_send, exit):
     # sends encoded message length and message to destination; if can't throw's an error
     try:
-        # print ("Sending RPC msg to destination: {}...".format(object_to_send))
         # serializing object into a JSON formatted stream and then encoded 
         # into a unicode string.
         send_msg_encoded = json.dumps(object_to_send).encode()
@@ -35,7 +34,7 @@ def recv_msg(sock, exit):
         recvd_msg_length_encoded = sock.recv(length_of_length, socket.MSG_WAITALL) # reads the message's (from sending socket) length
         recvd_msg_length, = struct.unpack("!i", recvd_msg_length_encoded) # decodes the 32-bit binary value as an int; big-endian
         recvd_msg = sock.recv(recvd_msg_length, socket.MSG_WAITALL)# reads the message
-        # print ("Received RPC msg from source: {}...".format(recvd_msg))
+   
         if (len(recvd_msg) == 0):
             # recv gives 0 result if the connection has been closed
             print("Connection terminated.") 
@@ -63,8 +62,6 @@ def recv_msg(sock, exit):
 def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
     dest_port = dest_port_low
     while (dest_port <= dest_port_max):
-        # print ("Creating connection with destination..")
-        # print('Trying to connect to ' + dest_host + ':' + str(dest_port) + '...')
         # Note these calls may throw an exception if it fails
         try:
             sock = socket.create_connection((dest_host, dest_port), timeout) # opens connection with view leader
@@ -73,7 +70,6 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
             if (dest_port < dest_port_max):
                 dest_port += 1
             else:
-                # print ("Cannot find an open port from {}-{}: ".format(dest_port_low, dest_port_max), e)
                 if (exit):
                     sys.exit()
                 else: 
@@ -83,7 +79,7 @@ def create_connection(dest_host, dest_port_low, dest_port_max, timeout, exit):
     try:
         return sock
     except Exception:
-        # print ("Socket couldn't be opened.")
+        print ("Socket couldn't be opened.")
         pass
 
 # Purpose & Behavior: Starts listening on the designated src port for a source host

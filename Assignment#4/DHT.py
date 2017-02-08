@@ -12,7 +12,7 @@ view_to_use = {}
 def hash_key(d):
     d_encoded = d.encode('utf-8')
     sha1 = hashlib.sha1(d_encoded)
-    # print ("HASH_MAX : {}".format(HASH_MAX))
+
     try:
         return int(sha1.hexdigest(), 16) % HASH_MAX
     except ZeroDivisionError as e:
@@ -42,12 +42,9 @@ def create_DHT():
     # adds active servers from view_to_use to DHT with new hashes
     for (addr, port, server_id), timestamp in view_to_use.items():
         if (len(server_dict) < replica_count): 
-            # print ("Server ID: {}".format(server_id))
             server_hash = hash_key(server_id)
-            # print ("Server Hash: {}".format(server_hash))
             server_dict[server_hash] = ((addr, port), server_id)
 
-    # print ("Server Dict: {}".format(server_dict))
     return server_dict
 
 # Purpose & Behavior: adds consecutive buckets (i.e. secondary and tertiary buckets) after the primary bucket has been determined
@@ -69,11 +66,9 @@ def add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order,
 def bucket_allocator(key, view):
     global view_to_use
     view_to_use = view
-    # print ("View to use: {}".format(view_to_use))
-    server_dict = create_DHT() #update DHT
+    server_dict = create_DHT() # update DHT
     key_hash = hash_key(key)
 
-    # print ("View to use after update: {}".format(view_to_use))
     # list of ((addr, port), server_id) for all replica servers associated with the given key
     replica_buckets = []
     server_hashes = []
@@ -83,12 +78,10 @@ def bucket_allocator(key, view):
             server_hashes.append(server_hash)
             replica_buckets.append(value)
 
-    # print ("Server Hashes: {}".format(server_hashes))
-
     last_dict_elem = None
     server_hashes_in_order = server_hashes
     server_hashes_in_order.sort()
-    # print ("Server Hash Ordered List : {}".format(server_hashes_in_order))
+
     server_hashes_length = len(server_hashes_in_order)
     if (server_hashes_length != 0):
         last_server_hash = server_hashes_in_order[server_hashes_length-1]
@@ -98,20 +91,14 @@ def bucket_allocator(key, view):
     bucket_count = len(replica_buckets)
     has_gtr_hash = False
 
-    # print ("Server Dict : {}".format(server_dict))
     if (server_dict is not None) and (bucket_count != replica_count):
         for server_hash, value in server_dict.items():
-            # print ("Server Hash : {}".format(server_hash))
-            # print ("Key Hash : {}".format(key_hash))
-            # print ("Bucket Count : {}".format(bucket_count))
-            # print ("Replica Count : {}".format(replica_count))
             if (server_hash >= key_hash) and (bucket_count < replica_count):
                 print ("Found a suitable replica bucket...")
                 replica_buckets.append(value)
                 bucket_count += 1 
                 has_gtr_hash = True
-                # print ("Value : {}".format(value))
-                # print ("Last Dict Elem : {}".format(last_dict_elem))
+
                 if (value == last_dict_elem) and (bucket_count < replica_count):
                     replica_buckets = add_consecutive_buckets(bucket_count, replica_count, server_hashes_in_order, server_dict, replica_buckets)
 

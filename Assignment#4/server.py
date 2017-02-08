@@ -41,7 +41,6 @@ class Server:
     # Input: None
     # Output: None
     def send_and_recv_heartbeat(self):
-        # print ('Sending heartbeat msg to viewleader...')
         try:
             sock = common_functions.contact_leader(self.view_leader_list)
             common_functions.send_msg(sock, {'cmd': 'heartbeat', 'args': [str(self.unique_id), socket.gethostname(), self.src_port]}, False)
@@ -72,14 +71,11 @@ class Server:
             try:
                 sock, (addr, accepted_port) = bound_socket.accept() # Returns the socket, address and port of the connection
                 if (accepted_port is not None): # checks if there is an accepted_port
-                    # print ("Accepting connection from host " + addr)
                     recvd_msg = common_functions.recv_msg(sock, False)
                     response = self.process_msg_from_client(recvd_msg)
                     common_functions.send_msg(sock, response, False)
-                    # print ("Finished sending message ({}) from server to dest...".format(response))
 
                     if (time.time() - self.last_heartbeat_time >= 10.0):
-                        # print ("Sending RPC Message and a RPC heartbeat...")
                         self.last_heartbeat_time = time.time()
                         self.send_and_recv_heartbeat()
             except socket.timeout:
@@ -232,7 +228,6 @@ class Server:
                 sock.close()
 
             with self.lock:
-                # print (key_value_replica)
                 try:
                     new_key, new_value = key_value_replica
                     if (new_key not in self.bucket):
@@ -244,11 +239,7 @@ class Server:
                     else:
                         if (epoch_op == 'add'):
                             if (old_view is not None):
-                                # print ("Old view: {}".format(old_view))
-                                # print ("New view: {}".format(new_view))
-                                # print ("unique_id: {}".format(self.unique_id))
                                 for [[addr, port], server_id] in old_view:
-                                    # print ("tuple: {}".format([[addr, port], server_id]))
                                     if (self.unique_id == server_id) and ([[addr, port], server_id] not in new_view):
                                         print ("Deleting {}:{} on old replica...".format(new_key, new_value))
                                         key_to_delete = new_key

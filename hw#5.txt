@@ -3,11 +3,11 @@
 	(b) Assume Recursive Lookup.
 
 		1. Client C contacts a local name server L to resolve www.google.com
-		2. L doesn't have the record for www.google.com, but it has the record for the authoritative root name server in its zone, which it can contact to find the record
+		2. L doesn't have the record for www.google.com, but it has the record for the authoritative root name server, which it can contact
 		3. Authoritative root name server doesn't have the record for www.google.com, but it can contact com name server which is in its zone
-		4. com name server doesn't have the record for www.google.com, but it can contact google.com name server which is in its zone
+		4. com name server doesn't have the record for www.google.com, but it can contact google.com authoritative name server which is in its zone
 		5. google.com name server returns record with the hostname www.google.com and ip 66.102.7.10
-		6. com name server returns record with the hostname www.google.com and ip 66.102.7.10 and record with the hostname google.com and its corresponding record with google.com's authoritative name server, ns1.google.com with the ip 216.239.3
+		6. com name server returns record with the hostname www.google.com and ip 66.102.7.10, record with the hostname google.com and its corresponding record with google.com's authoritative name server, ns1.google.com with the ip 216.239.3
 			Moreover, the com name server caches the record with hostname www.google.com
 		7. Authoritative root name server returns records with the hostname www.google.com and ip 66.102.7.10 and record with the hostname com and its corresponding record with com's authoritative name server, a.gtld-servers.net with the ip 192.5.6.30 
 			The authoritative root name server also caches the record with the hostname google.com and its corresponding nameserver's record with the hostname ns1.google.com

@@ -36,7 +36,6 @@ def broadcast(replicas, object_to_send, epoch, timeout):
             object_to_send['server_id'] = str(server_id)
         try: 
             server_sock = common_functions.create_connection(addr, port, port, timeout, False)
-            # print ("Sending {} to replica server {}...".format(object_to_send, (addr, port)))
             common_functions.send_msg(server_sock, object_to_send, False)
 
             if (rpc_command == 'request_vote'):
