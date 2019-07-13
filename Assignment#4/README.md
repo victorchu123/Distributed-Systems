@@ -1,5 +1,5 @@
 # Distributed File System
-*Features: Remote Procedure Call, Centralized Lock Server, Heartbeat Failure Detection, Rebalancing Distributed Hash Table, and Viewleader Data Redundancy*
+*Features: Centralized Lock Server, a Distributed Hash Table with Consistent Hashing, Viewleader election via Raft and distributed server management, Data Redundancy, Remote Procedure Calls, Heartbeat Failure Detection*
 ## Instructions:
 	1) Navigate to directory with all .py files with 'cd' command in Terminal.
 	
